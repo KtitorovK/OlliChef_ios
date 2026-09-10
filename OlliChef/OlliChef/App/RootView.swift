@@ -1,14 +1,30 @@
 import SwiftUI
 
-/// Mirrors App.tsx's AppContent: a NavigationStack wraps the whole main-app case so
-/// RecipeStory and UserProfile push over the entire tab bar (full-screen, tabs hidden)
-/// exactly like the RN root Stack.Navigator, rather than nesting inside one tab's stack.
+/// Mirrors App.tsx's AppContent gating order: onboarding is checked before auth and
+/// takes priority over it — a signed-in user who hasn't onboarded still sees
+/// onboarding first. `phase` is a plain computed property over directly-observed
+/// state (@StateObject / @AppStorage), so SwiftUI's own observation re-evaluates it
+/// automatically — no separate Combine pipeline needed.
+enum SessionPhase {
+    case loading
+    case onboarding
+    case auth
+    case main
+}
+
 struct RootView: View {
-    @StateObject private var session = SessionState()
+    @StateObject private var authState = AuthState()
+    @AppStorage("onboarding.completed") private var onboardingComplete = false
+
+    private var phase: SessionPhase {
+        guard authState.isInitialized else { return .loading }
+        if !onboardingComplete { return .onboarding }
+        return authState.user != nil ? .main : .auth
+    }
 
     var body: some View {
         Group {
-            switch session.phase {
+            switch phase {
             case .loading:
                 ProgressView()
                     .tint(AppColor.brandPrimary)
@@ -16,7 +32,7 @@ struct RootView: View {
                     .background(AppColor.surfaceBody)
 
             case .onboarding:
-                OnboardingScreen(onComplete: session.completeOnboarding)
+                OnboardingScreen(onComplete: { onboardingComplete = true })
 
             case .auth:
                 AuthScreen()
@@ -42,6 +58,7 @@ struct RootView: View {
                 .tint(AppColor.brandPrimary)
             }
         }
+        .environmentObject(authState)
     }
 }
 
