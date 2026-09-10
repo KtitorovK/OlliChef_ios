@@ -1,26 +1,17 @@
 import Network
-import Foundation
 
-/// Mirrors networkUtils.ts's checkInternetConnectivity: lenient by design — if the
-/// path can't be determined, assume connectivity rather than blocking the user.
-actor ConnectivityMonitor {
-    static let shared = ConnectivityMonitor()
-
-    private let monitor = NWPathMonitor()
-    private var isConnected = true
-
-    private init() {
-        monitor.pathUpdateHandler = { [weak self] path in
-            Task { await self?.update(path.status == .satisfied) }
+/// Mirrors networkUtils.ts's checkInternetConnectivity: a one-shot check, lenient by
+/// design — if the path can't be determined, assume connectivity rather than blocking
+/// the user.
+enum ConnectivityMonitor {
+    static func hasInternetConnectivity() async -> Bool {
+        let monitor = NWPathMonitor()
+        return await withCheckedContinuation { continuation in
+            monitor.pathUpdateHandler = { path in
+                monitor.cancel()
+                continuation.resume(returning: path.status == .satisfied)
+            }
+            monitor.start(queue: DispatchQueue(label: "com.biteplanai.connectivity-check"))
         }
-        monitor.start(queue: DispatchQueue(label: "com.biteplanai.connectivity-monitor"))
-    }
-
-    private func update(_ connected: Bool) {
-        isConnected = connected
-    }
-
-    func hasInternetConnectivity() -> Bool {
-        isConnected
     }
 }
