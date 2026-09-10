@@ -13,7 +13,7 @@ struct OlliChefApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
         }
     }
 }
