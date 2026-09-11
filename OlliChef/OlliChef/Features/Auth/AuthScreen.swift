@@ -56,7 +56,7 @@ struct AuthScreen: View {
                   let tokenData = credential.identityToken,
                   let idToken = String(data: tokenData, encoding: .utf8),
                   let rawNonce = currentNonce else {
-                errorMessage = "Apple Sign-In failed: no identity token"
+                errorMessage = "We couldn't complete Sign in with Apple. Please try again."
                 return
             }
             Task {
@@ -68,7 +68,7 @@ struct AuthScreen: View {
                     )
                 } catch {
                     handleError(error, context: ErrorContext(location: "AuthScreen", action: "apple_sign_in"))
-                    errorMessage = error.localizedDescription
+                    errorMessage = friendlyMessage(for: error)
                 }
             }
         case .failure(let error):
@@ -79,7 +79,20 @@ struct AuthScreen: View {
                 return
             }
             handleError(error, context: ErrorContext(location: "AuthScreen", action: "apple_sign_in"))
-            errorMessage = error.localizedDescription
+            errorMessage = friendlyMessage(for: error)
         }
+    }
+
+    /// Never show raw NSError text — the technical detail still reaches Crashlytics
+    /// via handleError above; this is only what the person on screen sees.
+    private func friendlyMessage(for error: Error) -> String {
+        if NetworkErrorClassifier.isNetworkError(error) {
+            return NetworkConfig.offlineMessage
+        }
+        let nsError = error as NSError
+        if nsError.domain == ASAuthorizationError.errorDomain {
+            return "Sign in with Apple isn't available right now. Make sure you're signed into an Apple ID on this device, then try again."
+        }
+        return "Something went wrong signing you in. Please try again."
     }
 }
