@@ -4,7 +4,7 @@ import SwiftUI
 struct UserProfileScreen: View {
     var body: some View {
         Text("Profile")
-            .font(.system(size: AppTypography.headline))
+            .font(AppTypography.headline)
             .foregroundStyle(AppColor.textPrimary)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColor.surfaceBody)

@@ -33,12 +33,17 @@ enum AppRadius {
     static let large: CGFloat = 12
 }
 
+/// Ported from theme/platform.ts's typography scale, but as semantic text styles
+/// rather than fixed point sizes — the original never supported Dynamic Type, and
+/// SwiftUI's built-in styles (.title2, .title3, etc.) scale with the user's
+/// accessibility text-size setting automatically. Mapped by closest default point
+/// size to preserve the original's relative scale (displayXL > title > headline > ...).
 enum AppTypography {
-    static let displayXL: CGFloat = 40
-    static let title: CGFloat = 24
-    static let headline: CGFloat = 20
-    static let subhead: CGFloat = 18
-    static let body: CGFloat = 16
-    static let caption: CGFloat = 14
-    static let label: CGFloat = 12
+    static let displayXL: Font = .largeTitle   // ~34pt, was 40
+    static let title: Font = .title2           // ~22pt, was 24
+    static let headline: Font = .title3        // ~20pt, was 20 — exact match
+    static let subhead: Font = .headline       // ~17pt, was 18
+    static let body: Font = .body              // ~17pt, was 16
+    static let caption: Font = .footnote       // ~13pt, was 14
+    static let label: Font = .caption          // ~12pt, was 12 — exact match
 }

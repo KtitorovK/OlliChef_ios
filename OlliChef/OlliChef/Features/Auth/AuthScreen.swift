@@ -14,18 +14,18 @@ struct AuthScreen: View {
             Spacer().frame(height: 96)
 
             Text("OlliChef")
-                .font(.system(size: AppTypography.displayXL, weight: .bold))
+                .font(AppTypography.displayXL.weight(.bold))
                 .foregroundStyle(AppColor.brandSecondary)
 
             Text("Your AI chef for easy meal planning")
-                .font(.system(size: AppTypography.body))
+                .font(AppTypography.body)
                 .foregroundStyle(AppColor.textSecondary)
 
             Spacer()
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(.system(size: AppTypography.caption))
+                    .font(AppTypography.caption)
                     .foregroundStyle(AppColor.statusError)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, AppSpacing.contentPadding)

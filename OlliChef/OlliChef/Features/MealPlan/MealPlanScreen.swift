@@ -34,10 +34,10 @@ struct MealPlanScreen: View {
                 .scaledToFit()
                 .frame(maxHeight: 240)
             Text("No meal plan yet")
-                .font(.system(size: AppTypography.subhead, weight: .semibold))
+                .font(AppTypography.subhead.weight(.semibold))
                 .foregroundStyle(AppColor.textPrimary)
             Text("Ask Olli in Chat to plan your week")
-                .font(.system(size: AppTypography.body))
+                .font(AppTypography.body)
                 .foregroundStyle(AppColor.textSecondary)
         }
         .padding(AppSpacing.contentPadding)
@@ -47,20 +47,20 @@ struct MealPlanScreen: View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.contentPadding) {
                 Text(day.day ?? day.date)
-                    .font(.system(size: AppTypography.title, weight: .bold))
+                    .font(AppTypography.title.weight(.bold))
                     .foregroundStyle(AppColor.textPrimary)
 
                 ForEach(day.meals) { meal in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(meal.type?.capitalized ?? "Meal")
-                            .font(.system(size: AppTypography.label, weight: .semibold))
+                            .font(AppTypography.label.weight(.semibold))
                             .foregroundStyle(AppColor.textSecondary)
                         Text(meal.name)
-                            .font(.system(size: AppTypography.subhead, weight: .medium))
+                            .font(AppTypography.subhead.weight(.medium))
                             .foregroundStyle(AppColor.textPrimary)
                         if let nutrition = meal.nutritionInfo {
                             Text(nutritionSummary(nutrition))
-                                .font(.system(size: AppTypography.caption))
+                                .font(AppTypography.caption)
                                 .foregroundStyle(AppColor.textSecondary)
                         }
                     }

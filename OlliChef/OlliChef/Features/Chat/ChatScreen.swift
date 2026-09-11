@@ -69,7 +69,7 @@ struct ChatScreen: View {
             HStack {
                 if message.role == .user { Spacer(minLength: 40) }
                 Text(message.error ?? message.content ?? "")
-                    .font(.system(size: AppTypography.body))
+                    .font(AppTypography.body)
                     .foregroundStyle(message.role == .user ? AppColor.textOnBrand : AppColor.textPrimary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
@@ -91,11 +91,11 @@ private struct MealPlanCard: View {
             ForEach(mealPlan.days, id: \.date) { day in
                 VStack(alignment: .leading, spacing: 6) {
                     Text("\(day.day ?? day.date) — \(day.meals.count) Meals")
-                        .font(.system(size: AppTypography.subhead, weight: .semibold))
+                        .font(AppTypography.subhead.weight(.semibold))
                         .foregroundStyle(AppColor.textPrimary)
                     ForEach(day.meals) { meal in
                         Text(meal.name)
-                            .font(.system(size: AppTypography.body, weight: .medium))
+                            .font(AppTypography.body.weight(.medium))
                             .foregroundStyle(AppColor.textPrimary)
                     }
                 }
@@ -108,7 +108,7 @@ private struct MealPlanCard: View {
                     Text("Accept Plan")
                 }
             }
-            .font(.system(size: AppTypography.body, weight: .bold))
+            .font(AppTypography.body.weight(.bold))
             .foregroundStyle(AppColor.textOnBrand)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)

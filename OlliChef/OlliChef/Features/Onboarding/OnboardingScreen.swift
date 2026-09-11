@@ -57,7 +57,7 @@ struct OnboardingScreen: View {
             HStack {
                 Spacer()
                 Button("Skip", action: onComplete)
-                    .font(.system(size: isIPad ? 18 : 16, weight: .medium))
+                    .font(AppTypography.subhead.weight(.medium))
                     .foregroundStyle(AppColor.brandPrimary)
             }
             .padding(.horizontal, 16)
@@ -81,7 +81,7 @@ struct OnboardingScreen: View {
 
                 Button(action: isLast ? onComplete : goNext) {
                     Text(isLast ? "Get Started" : "Next")
-                        .font(.system(size: isIPad ? 20 : 16, weight: .semibold))
+                        .font(AppTypography.body.weight(.semibold))
                         .foregroundStyle(AppColor.textOnBrand)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
@@ -110,12 +110,12 @@ struct OnboardingScreen: View {
                 .frame(maxHeight: .infinity)
 
             Text(slide.headline)
-                .font(.system(size: AppTypography.title, weight: .bold))
+                .font(AppTypography.title.weight(.bold))
                 .foregroundStyle(AppColor.textPrimary)
                 .multilineTextAlignment(.center)
 
             Text(slide.body)
-                .font(.system(size: AppTypography.body))
+                .font(AppTypography.body)
                 .foregroundStyle(AppColor.textSecondary)
                 .multilineTextAlignment(.center)
         }
