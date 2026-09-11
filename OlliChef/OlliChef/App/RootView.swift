@@ -44,7 +44,10 @@ struct RootView: View {
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink(value: ProfileRoute()) {
-                                    Image(systemName: "person.crop.circle")
+                                    Image("IconProfile")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 24, height: 24)
                                 }
                             }
                         }

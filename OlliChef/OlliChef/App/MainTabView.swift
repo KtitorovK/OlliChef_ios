@@ -11,15 +11,15 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $router.selection) {
             ChatScreen()
-                .tabItem { Label("Chat", systemImage: "bubble.left.and.bubble.right") }
+                .tabItem { Label("Chat", image: "IconChat") }
                 .tag(MainTab.chat)
 
             MealPlanScreen()
-                .tabItem { Label("Meal Plan", systemImage: "calendar") }
+                .tabItem { Label("Meal Plan", image: "IconMealPlan") }
                 .tag(MainTab.mealPlan)
 
             GroceryListScreen()
-                .tabItem { Label("Groceries", systemImage: "cart") }
+                .tabItem { Label("Groceries", image: "IconGroceries") }
                 .tag(MainTab.groceries)
         }
         .tint(AppColor.brandPrimary)

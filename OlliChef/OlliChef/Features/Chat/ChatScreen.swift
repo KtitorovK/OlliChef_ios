@@ -33,10 +33,10 @@ struct ChatScreen: View {
             HStack(spacing: 8) {
                 TextField("Type your message...", text: $viewModel.inputText, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 10)
                     .background(AppColor.cardSurface)
-                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium))
+                    .clipShape(Capsule())
 
                 Button {
                     Task { await viewModel.send() }
