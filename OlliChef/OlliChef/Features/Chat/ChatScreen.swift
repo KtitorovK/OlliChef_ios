@@ -16,7 +16,10 @@ struct ChatScreen: View {
                             messageView(message).id(message.id)
                         }
                         if viewModel.isThinking {
-                            ProgressView().padding(.vertical, 8)
+                            ProgressView()
+                                .tint(AppColor.brandPrimary)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 8)
                         }
                     }
                     .padding(AppSpacing.contentPadding)
