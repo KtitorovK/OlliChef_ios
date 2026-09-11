@@ -10,8 +10,8 @@ struct AuthScreen: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: AppSpacing.contentPadding * 2) {
-            Spacer()
+        VStack(spacing: AppSpacing.contentPadding) {
+            Spacer().frame(height: 96)
 
             Text("OlliChef")
                 .font(.system(size: AppTypography.displayXL, weight: .bold))
@@ -36,9 +36,8 @@ struct AuthScreen: View {
                 .frame(height: 50)
                 .padding(.horizontal, AppSpacing.buttonHorizontal)
                 .disabled(authState.isLoading)
-
-            Spacer().frame(height: AppSpacing.contentPadding * 2)
         }
+        .padding(.bottom, 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppColor.surfaceBody)
     }
