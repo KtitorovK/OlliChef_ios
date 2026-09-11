@@ -48,7 +48,7 @@ struct ChatScreen: View {
                 .disabled(viewModel.inputText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isThinking)
             }
             .padding(AppSpacing.contentPadding)
-            .background(AppColor.surfaceHeader)
+            .background(AppColor.surfaceHeader.ignoresSafeArea(edges: .bottom))
         }
         .background(AppColor.surfaceBody)
         .task { await viewModel.loadWelcomeMessage() }
