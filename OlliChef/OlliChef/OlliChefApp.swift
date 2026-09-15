@@ -9,9 +9,11 @@ import SwiftUI
 
 @main
 struct OlliChefApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
         }
     }
 }

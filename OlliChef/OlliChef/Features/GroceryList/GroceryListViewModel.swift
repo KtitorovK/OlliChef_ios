@@ -1,0 +1,107 @@
+import Combine
+import Foundation
+
+/// Ported from GroceryListScreen.tsx. Unlike the RN screen — whose checkbox toggles
+/// are local React state only, never written back to Firestore, so checked items don't
+/// survive a restart — this persists every toggle immediately.
+@MainActor
+final class GroceryListViewModel: ObservableObject {
+    @Published private(set) var groupedItems: [(category: String, items: [GroceryItem])] = []
+    @Published var isLoading = true
+    @Published var errorMessage: String?
+
+    private var groceryList: GroceryList?
+
+    var totalItems: Int { groupedItems.reduce(0) { $0 + $1.items.count } }
+    var hasItems: Bool { totalItems > 0 }
+
+    func load() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            guard let mealPlan = try await MealPlanStorageService.currentMealPlan(),
+                  let list = try await GroceryListStorageService.get(byMealPlanId: mealPlan.id) else {
+                groceryList = nil
+                groupedItems = []
+                return
+            }
+            groceryList = list
+            regroup()
+        } catch {
+            handleError(error, context: ErrorContext(location: "GroceryListScreen", action: "load"))
+            errorMessage = NetworkErrorClassifier.isNetworkError(error) ? NetworkConfig.offlineMessage : "Failed to load grocery list"
+        }
+    }
+
+    func isCategoryFullyChecked(_ items: [GroceryItem]) -> Bool {
+        !items.isEmpty && items.allSatisfy(\.checked)
+    }
+
+    func toggleItem(category: String, name: String) async {
+        guard var list = groceryList,
+              let index = list.items.firstIndex(where: { $0.category == category && $0.name == name }) else { return }
+        list.items[index].checked.toggle()
+        groceryList = list
+        regroup()
+        await persist(list)
+    }
+
+    func toggleCategory(_ category: String) async {
+        guard var list = groceryList else { return }
+        let indices = list.items.indices.filter { list.items[$0].category == category }
+        guard !indices.isEmpty else { return }
+        let allChecked = indices.allSatisfy { list.items[$0].checked }
+        for index in indices {
+            list.items[index].checked = !allChecked
+        }
+        groceryList = list
+        regroup()
+        await persist(list)
+    }
+
+    func shareText() -> String {
+        var text = "🛒 My Grocery List:\n\n"
+        for (category, items) in groupedItems {
+            text += "📋 \(category):\n"
+            for item in items {
+                var amountText = ""
+                if let amount = item.amount {
+                    let amountString = amount.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(amount)) : String(amount)
+                    amountText = " (\(amountString) \(item.unit ?? ""))"
+                }
+                text += "\(item.checked ? "✅" : "⬜️") \(item.name)\(amountText)\n"
+            }
+            text += "\n"
+        }
+        return text
+    }
+
+    /// Mirrors the grouping in fetchGroceryList: buckets items by category, preserving
+    /// each category's first-appearance order in the stored item array.
+    private func regroup() {
+        guard let groceryList else {
+            groupedItems = []
+            return
+        }
+        var order: [String] = []
+        var buckets: [String: [GroceryItem]] = [:]
+        for item in groceryList.items {
+            if buckets[item.category] == nil {
+                buckets[item.category] = []
+                order.append(item.category)
+            }
+            buckets[item.category]?.append(item)
+        }
+        groupedItems = order.map { ($0, buckets[$0] ?? []) }
+    }
+
+    private func persist(_ list: GroceryList) async {
+        do {
+            try await GroceryListStorageService.update(list)
+        } catch {
+            handleError(error, context: ErrorContext(location: "GroceryListScreen", action: "persistToggle"))
+        }
+    }
+}

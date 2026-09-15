@@ -19,6 +19,7 @@ Pods/
 *.xcconfig
 !Config.template.xcconfig
 GoogleService-Info.plist
+Secrets.swift
 
 # macOS
 .DS_Store
