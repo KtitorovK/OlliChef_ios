@@ -5,7 +5,7 @@ import UIKit
 /// StoreKit 2 (no SKPaymentQueue), just stripped of its RCTEventEmitter/Objective-C
 /// bridging since there's no JS side to bridge to anymore. Logic (entitlement scan,
 /// grace period, verification) is unchanged from the proven original.
-struct SubscriptionStatusInfo: Equatable {
+nonisolated struct SubscriptionStatusInfo: Equatable {
     enum State: String {
         case inactive, active, grace
     }
@@ -38,7 +38,7 @@ struct SubscriptionStatusInfo: Equatable {
     }
 }
 
-struct SubscriptionProductInfo {
+nonisolated struct SubscriptionProductInfo {
     let id: String
     let displayName: String
     let displayPrice: String
@@ -125,11 +125,17 @@ actor StoreKitService {
     }
 
     func showManageSubscriptions() async throws {
-        guard let scene = await UIApplication.shared.connectedScenes
-            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene else {
-            return
-        }
+        guard let scene = await Self.activeWindowScene() else { return }
         try await AppStore.showManageSubscriptions(in: scene)
+    }
+
+    /// UIScene's `activationState` is genuinely MainActor-isolated in UIKit (not a
+    /// false positive from the project's default isolation) — the lookup has to
+    /// actually run on the main actor rather than just being awaited into from here.
+    @MainActor
+    private static func activeWindowScene() -> UIWindowScene? {
+        UIApplication.shared.connectedScenes
+            .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
     }
 
     func getStatus() async -> SubscriptionStatusInfo {
@@ -154,7 +160,7 @@ actor StoreKitService {
         let isRevoked = t.revocationDate != nil
         let isExpired = t.expirationDate.map { $0 <= Date() } ?? true
         let isActive = !isRevoked && !isExpired
-        let isTrial = t.offerType == .introductory
+        let isTrial = t.offer?.type == .introductory
 
         var willAutoRenew = false
         var gracePeriodExpiresAt: Date?

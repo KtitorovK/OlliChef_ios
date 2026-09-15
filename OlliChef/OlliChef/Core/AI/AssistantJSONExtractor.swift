@@ -3,7 +3,7 @@ import Foundation
 /// Ported from chatService.ts's tryExtractJsonFromText/isStructuredMealPlan: scans
 /// for the first balanced {...} or [...] block in assistant text, tolerating preamble
 /// text the model sometimes adds despite instructions not to.
-enum AssistantJSONExtractor {
+nonisolated enum AssistantJSONExtractor {
     static func tryExtractJSON(from text: String) -> [String: Any]? {
         guard !text.isEmpty else { return nil }
 

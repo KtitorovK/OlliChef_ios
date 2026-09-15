@@ -3,7 +3,7 @@ import Foundation
 
 /// Mirrors ErrorService.ts: all errors are logged via Crashlytics, with the same
 /// attribute shape (error_type, screen, timestamp, meta) so dashboards stay comparable.
-enum ErrorService {
+nonisolated enum ErrorService {
     static func initializeCrashlytics() {
         let crashlytics = Crashlytics.crashlytics()
         crashlytics.setCrashlyticsCollectionEnabled(true)

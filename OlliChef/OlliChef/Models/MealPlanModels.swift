@@ -3,7 +3,7 @@ import Foundation
 /// Ported from src/types/mealPlan.ts. Pure data shape only — parsing, validation, and
 /// Firestore CRUD land in the Chat + Meal Plan phase, not here.
 
-struct Ingredient: Codable, Hashable {
+nonisolated struct Ingredient: Codable, Hashable {
     var name: String
     var category: String?
     var amount: Double?
@@ -18,7 +18,7 @@ struct Ingredient: Codable, Hashable {
     }
 }
 
-struct NutritionInfo: Codable, Hashable {
+nonisolated struct NutritionInfo: Codable, Hashable {
     var calories: Double?
     var protein: Double?
     var carbs: Double?
@@ -35,7 +35,7 @@ struct NutritionInfo: Codable, Hashable {
     }
 }
 
-struct Meal: Codable, Hashable, Identifiable {
+nonisolated struct Meal: Codable, Hashable, Identifiable {
     var id: String
     var name: String
     var type: String?
@@ -51,7 +51,7 @@ struct Meal: Codable, Hashable, Identifiable {
     var nutritionInfo: NutritionInfo?
 }
 
-struct DayMeals: Codable, Hashable {
+nonisolated struct DayMeals: Codable, Hashable {
     var date: String
     var day: String?
     var meals: [Meal]
@@ -129,7 +129,7 @@ struct DayMeals: Codable, Hashable {
     }()
 }
 
-struct MealPlan: Codable, Hashable, Identifiable {
+nonisolated struct MealPlan: Codable, Hashable, Identifiable {
     var id: String
     var startDate: String
     var endDate: String

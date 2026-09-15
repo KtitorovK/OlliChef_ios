@@ -4,7 +4,7 @@ import Foundation
 /// Ported verbatim from remoteConfigService.ts's DEFAULT_PROMPTS — these are the
 /// fallback values if Remote Config fails; the live values still come from the same
 /// Firebase Remote Config project.
-enum DefaultPrompts {
+nonisolated enum DefaultPrompts {
     static let dynamicPrompt = """
     You are a master chef specializing in crafting weekly meal plans for families, with a flair for humor and a love for keeping things lighthearted. Today is {{CURRENT_DATE}}.
 
@@ -89,7 +89,7 @@ enum DefaultPrompts {
     """
 }
 
-enum RemoteConfigKey: String {
+nonisolated enum RemoteConfigKey: String {
     case dynamicPrompt = "ai_dynamic_prompt"
     case welcomeMessage = "ai_welcome_message"
     case errorRecoveryPrompt = "ai_error_recovery_prompt"

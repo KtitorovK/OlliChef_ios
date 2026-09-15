@@ -4,7 +4,7 @@ import FirebaseFirestore
 
 /// Mirrors networkUtils.ts's isNetworkError: classifies transport/offline failures
 /// across URLSession, Firebase Auth, and Firestore.
-enum NetworkErrorClassifier {
+nonisolated enum NetworkErrorClassifier {
     static func isNetworkError(_ error: Error) -> Bool {
         if let urlError = error as? URLError {
             switch urlError.code {
