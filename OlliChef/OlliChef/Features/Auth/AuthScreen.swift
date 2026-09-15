@@ -16,10 +16,12 @@ struct AuthScreen: View {
             Text("OlliChef")
                 .font(AppTypography.displayXL.weight(.bold))
                 .foregroundStyle(AppColor.brandSecondary)
+                .accessibilityIdentifier("auth.title")
 
             Text("Your AI chef for easy meal planning")
                 .font(AppTypography.body)
                 .foregroundStyle(AppColor.textSecondary)
+                .accessibilityIdentifier("auth.tagline")
 
             Spacer()
 

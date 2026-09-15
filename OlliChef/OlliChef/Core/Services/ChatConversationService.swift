@@ -16,7 +16,7 @@ enum ChatConversationService {
         Auth.auth().currentUser?.uid
     }
 
-    static func create(openaiThreadId: String, title: String = "New Chat") async throws -> ChatConversation {
+    static func create(openaiConversationId: String, title: String = "New Chat") async throws -> ChatConversation {
         guard let uid = currentUserId else {
             throw FirebaseTokenProviderError.signInRequired
         }
@@ -26,7 +26,7 @@ enum ChatConversationService {
             id: docRef.documentID,
             userId: uid,
             title: title,
-            openaiThreadId: openaiThreadId,
+            openaiConversationId: openaiConversationId,
             createdAt: now,
             updatedAt: now,
             lastMessageAt: nil,
@@ -53,10 +53,10 @@ enum ChatConversationService {
         return try snapshot.documents.first?.data(as: ChatConversation.self)
     }
 
-    static func update(_ conversationId: String, openaiThreadId: String? = nil, lastMessageAt: String? = nil, messageCount: Int? = nil) async throws {
+    static func update(_ conversationId: String, openaiConversationId: String? = nil, lastMessageAt: String? = nil, messageCount: Int? = nil) async throws {
         guard let uid = currentUserId else { return }
         var data: [String: Any] = ["updatedAt": ISO8601DateFormatter().string(from: Date())]
-        if let openaiThreadId { data["openaiThreadId"] = openaiThreadId }
+        if let openaiConversationId { data["openaiConversationId"] = openaiConversationId }
         if let lastMessageAt { data["lastMessageAt"] = lastMessageAt }
         if let messageCount { data["messageCount"] = messageCount }
         try await collection(for: uid).document(conversationId).updateData(data)

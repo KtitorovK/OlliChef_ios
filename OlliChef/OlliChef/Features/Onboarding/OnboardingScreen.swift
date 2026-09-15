@@ -59,6 +59,7 @@ struct OnboardingScreen: View {
                 Button("Skip", action: onComplete)
                     .font(AppTypography.subhead.weight(.medium))
                     .foregroundStyle(AppColor.brandPrimary)
+                    .accessibilityIdentifier("onboarding.skip")
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
@@ -89,6 +90,10 @@ struct OnboardingScreen: View {
                         .clipShape(RoundedRectangle(cornerRadius: AppRadius.large))
                 }
                 .padding(.horizontal, isIPad ? 48 : AppSpacing.contentPadding)
+                // Same identifier throughout even though the label changes ("Next" →
+                // "Get Started") — per the testing plan's own rule, tests key off a
+                // stable identifier, never the display text.
+                .accessibilityIdentifier("onboarding.continue")
             }
             .padding(.top, 8)
             .padding(.bottom, 24)
@@ -113,6 +118,7 @@ struct OnboardingScreen: View {
                 .font(AppTypography.title.weight(.bold))
                 .foregroundStyle(AppColor.textPrimary)
                 .multilineTextAlignment(.center)
+                .accessibilityIdentifier("onboarding.headline")
 
             Text(slide.body)
                 .font(AppTypography.body)

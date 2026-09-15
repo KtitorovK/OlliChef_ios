@@ -66,4 +66,52 @@ enum UserProfileService {
             "lastActive": ISO8601DateFormatter().string(from: Date()),
         ])
     }
+
+    /// Mirrors updateUserProfile: a merge-write so a missing profile doc doesn't throw.
+    static func updateDisplayName(_ displayName: String) async throws {
+        guard let uid = currentUserId else { return }
+        try await db.collection("userProfiles").document(uid).setData([
+            "displayName": displayName,
+            "updatedAt": ISO8601DateFormatter().string(from: Date()),
+        ], merge: true)
+    }
+
+    /// Mirrors deleteUserAccount: anonymizes the user's data (preserved for analytics,
+    /// stripped of the live user association), deletes the profile doc, then deletes
+    /// the Firebase Auth user itself. No re-authentication step — matches RN exactly,
+    /// which also has none; a `requires-recent-login` failure just surfaces as a plain
+    /// "failed to delete" error to the caller, same as here.
+    static func deleteAccount() async throws {
+        guard let uid = currentUserId, let currentUser = Auth.auth().currentUser else { return }
+
+        try await anonymizeUserData(uid)
+        try await db.collection("userProfiles").document(uid).delete()
+        try await currentUser.delete()
+    }
+
+    /// Mirrors anonymizeUserData: moves each doc in mealPlans/groceryLists/
+    /// chatConversations to a top-level anonymized collection (tagged with
+    /// originalUserId + anonymizedAt), deletes the original, then deletes the
+    /// now-empty users/{uid} doc itself.
+    private static func anonymizeUserData(_ uid: String) async throws {
+        let now = ISO8601DateFormatter().string(from: Date())
+        let userDoc = db.collection("users").document(uid)
+
+        for (subcollection, anonymizedCollection) in [
+            ("mealPlans", "anonymizedMealPlans"),
+            ("groceryLists", "anonymizedGroceryLists"),
+            ("chatConversations", "anonymizedChatConversations"),
+        ] {
+            let snapshot = try await userDoc.collection(subcollection).getDocuments()
+            for document in snapshot.documents {
+                var anonymizedData = document.data()
+                anonymizedData["originalUserId"] = uid
+                anonymizedData["anonymizedAt"] = now
+                try await db.collection(anonymizedCollection).document(document.documentID).setData(anonymizedData)
+                try await document.reference.delete()
+            }
+        }
+
+        try await userDoc.delete()
+    }
 }

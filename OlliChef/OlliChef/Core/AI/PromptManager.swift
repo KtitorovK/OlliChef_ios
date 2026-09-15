@@ -61,6 +61,9 @@ enum DefaultPrompts {
     ### Overview
     A short, appetizing 1–2 sentence description.
 
+    ### Ingredients
+    A formatted list with amounts.
+
     ### Instructions
     Numbered steps, each with a ### heading that names the step (e.g., ### 1. Prep the vegetables). Keep steps clear and actionable.
 

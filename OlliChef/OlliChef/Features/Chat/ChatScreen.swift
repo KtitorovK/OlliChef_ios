@@ -6,6 +6,8 @@ import SwiftUI
 struct ChatScreen: View {
     @StateObject private var viewModel = ChatViewModel()
     @EnvironmentObject private var tabRouter: TabRouter
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var isRegular: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,11 +56,78 @@ struct ChatScreen: View {
             .background(AppColor.surfaceHeader.ignoresSafeArea(edges: .bottom))
         }
         .background(AppColor.surfaceBody)
-        .task { await viewModel.loadWelcomeMessage() }
+        .task { await viewModel.loadHistory() }
         .alert("Error", isPresented: .constant(viewModel.acceptError != nil), presenting: viewModel.acceptError) { _ in
             Button("OK") { viewModel.acceptError = nil }
         } message: { message in
             Text(message)
+        }
+        .overlay {
+            if viewModel.isAccepting {
+                acceptingOverlay
+            }
+        }
+    }
+
+    /// Mirrors the "Meal plan acceptance blocking overlay": a dimmed full-screen scrim
+    /// behind a small card with a 3-step progress list, so accepting a plan doesn't just
+    /// silently swap the button for a spinner — a step this port had dropped entirely.
+    private var acceptingOverlay: some View {
+        ZStack {
+            AppColor.textPrimary.opacity(0.45)
+                .ignoresSafeArea()
+
+            VStack(spacing: 12) {
+                Text("Saving your plan...")
+                    .font(.system(size: isRegular ? 22 : 18))
+                    .foregroundStyle(AppColor.brandSecondary)
+                    .multilineTextAlignment(.center)
+
+                ProgressView()
+                    .tint(AppColor.brandPrimary)
+
+                VStack(spacing: 12) {
+                    acceptStepRow(number: 1, icon: "1", label: "Saving meal plan")
+                    acceptStepRow(number: 2, icon: "2", label: "Building grocery list")
+                    acceptStepRow(number: 3, icon: "✓", label: "All done!")
+                }
+                .padding(.top, 4)
+
+                Text("This takes a few seconds")
+                    .font(.system(size: 14))
+                    .foregroundStyle(AppColor.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
+            }
+            .padding(.vertical, 22)
+            .padding(.horizontal, 24)
+            .frame(width: isRegular ? 320 : 240)
+            .background(AppColor.cardSurface)
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium))
+            .shadow(color: AppColor.textPrimary.opacity(0.2), radius: 16, y: 8)
+        }
+        .transition(.opacity)
+    }
+
+    private func acceptStepRow(number: Int, icon: String, label: String) -> some View {
+        let status = viewModel.acceptStep.status(forStep: number)
+        let isHighlighted = status != .inactive
+        let textColor: Color = status == .inactive ? AppColor.textSecondary : status == .done ? AppColor.brandPrimary : AppColor.textPrimary
+
+        return HStack(spacing: 10) {
+            Circle()
+                .strokeBorder(isHighlighted ? AppColor.brandPrimary : AppColor.textSecondary, lineWidth: 2)
+                .background(Circle().fill(isHighlighted ? AppColor.brandPrimary : .clear))
+                .frame(width: 18, height: 18)
+                .overlay {
+                    Text(icon)
+                        .font(.system(size: 11))
+                        .foregroundStyle(isHighlighted ? AppColor.textOnBrand : AppColor.textSecondary)
+                }
+            Text(label)
+                .font(.system(size: 14))
+                .foregroundStyle(textColor)
+            Spacer(minLength: 0)
         }
     }
 
@@ -84,43 +153,84 @@ struct ChatScreen: View {
     }
 }
 
+/// Ported from ChatScreen.tsx's inline meal-plan bubble (AppChatMealPlanNew styles):
+/// one card holding every day, each day listing its meals with a Pexels thumbnail and
+/// inline nutrition, tap-through to the recipe, then an intro line + Accept Plan button.
 private struct MealPlanCard: View {
     let mealPlan: MealPlan
     let isAccepting: Bool
     let onAccept: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             ForEach(mealPlan.days, id: \.date) { day in
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("\(day.day ?? day.date) — \(day.meals.count) Meals")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("\(day.shortWeekdayLabel) — \(day.meals.count) Meal\(day.meals.count == 1 ? "" : "s")")
                         .font(AppTypography.subhead.weight(.semibold))
                         .foregroundStyle(AppColor.textPrimary)
                     ForEach(day.meals) { meal in
-                        Text(meal.name)
-                            .font(AppTypography.body.weight(.medium))
-                            .foregroundStyle(AppColor.textPrimary)
+                        NavigationLink(value: meal) {
+                            mealRow(meal)
+                        }
+                        .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
                     }
                 }
             }
 
-            Button(action: onAccept) {
-                if isAccepting {
-                    ProgressView().tint(AppColor.textOnBrand)
-                } else {
-                    Text("Accept Plan")
+            VStack(spacing: 8) {
+                Text("Your plan is ready!\nIf you like it, click:")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppColor.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Button(action: onAccept) {
+                    if isAccepting {
+                        ProgressView().tint(AppColor.textOnBrand)
+                    } else {
+                        Text("Accept Plan")
+                    }
                 }
+                .font(AppTypography.body.weight(.bold))
+                .foregroundStyle(AppColor.textOnBrand)
+                .padding(.horizontal, AppSpacing.buttonHorizontal)
+                .padding(.vertical, 10)
+                .background(AppColor.brandPrimary)
+                .clipShape(Capsule())
+                .disabled(isAccepting)
+                .hoverEffect(.highlight)
             }
-            .font(AppTypography.body.weight(.bold))
-            .foregroundStyle(AppColor.textOnBrand)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(AppColor.brandPrimary)
-            .clipShape(Capsule())
-            .disabled(isAccepting)
         }
         .padding(14)
         .background(AppColor.cardSurface)
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium))
+        .overlay {
+            // cardSurface (#fff) sits on a near-identical cream page background
+            // (surfaceBody, #fefdf2) — the same 1px-apart colors RN itself uses — so
+            // without a visible edge the rounded corners all but disappear. RN leans on
+            // this card floating over a plain screen; here it floats inside a scrolling
+            // chat thread, where that lack of contrast reads as a layout bug rather than
+            // an intentional flat design, so a hairline border makes the shape legible.
+            RoundedRectangle(cornerRadius: AppRadius.medium)
+                .stroke(AppColor.border, lineWidth: 1)
+        }
+    }
+
+    private func mealRow(_ meal: Meal) -> some View {
+        HStack(spacing: 8) {
+            MealImageView(mealName: meal.name, size: .small, overrideBox: (32, 32, 4))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(meal.name)
+                    .font(AppTypography.body.weight(.medium))
+                    .foregroundStyle(AppColor.textPrimary)
+                if let nutrition = meal.nutritionInfo, !nutrition.summaryText.isEmpty {
+                    Text(nutrition.summaryText)
+                        .font(AppTypography.label)
+                        .foregroundStyle(AppColor.textSecondary)
+                }
+            }
+        }
     }
 }
