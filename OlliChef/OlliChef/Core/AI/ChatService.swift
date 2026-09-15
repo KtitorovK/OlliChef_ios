@@ -1,8 +1,11 @@
 import Foundation
 
-private struct IDResponse: Decodable { let id: String }
+// Pure Decodable DTOs with no actor affinity — exempted from the project's default
+// MainActor isolation so JSONDecoder (itself nonisolated) can decode them from
+// ChatService's own actor context without a cross-actor hop.
+private nonisolated struct IDResponse: Decodable { let id: String }
 
-private struct ResponsesAPIResult: Decodable {
+private nonisolated struct ResponsesAPIResult: Decodable {
     let output: [OutputItem]?
     let error: APIErrorDetail?
 
@@ -19,7 +22,7 @@ private struct ResponsesAPIResult: Decodable {
     }
 }
 
-private struct ConversationItemsResult: Decodable {
+private nonisolated struct ConversationItemsResult: Decodable {
     let data: [Item]
 
     struct Item: Decodable {

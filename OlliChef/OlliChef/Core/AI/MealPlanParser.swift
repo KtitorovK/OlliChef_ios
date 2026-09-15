@@ -1,6 +1,6 @@
 import Foundation
 
-enum MealPlanParser {
+nonisolated enum MealPlanParser {
     /// Ported from nutritionUtils.ts's calculateCaloriesFromPFC.
     static func calculateCalories(protein: Double = 0, fat: Double = 0, carbs: Double = 0) -> Double {
         protein * 4 + fat * 9 + carbs * 4
