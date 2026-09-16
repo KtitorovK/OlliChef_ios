@@ -1,5 +1,25 @@
 import SwiftUI
 
+/// NavigationLink(value:) silently fails to reach an ancestor's navigationDestination
+/// when it sits inside this screen's own page-style day-pager TabView nested inside
+/// iPad's outer Chat/MealPlan/Groceries TabView inside a NavigationSplitView detail
+/// column — a real, still-unresolved SwiftUI/NavigationSplitView bug on this SDK (every
+/// push mechanism tried there, including the pre-iOS16 NavigationLink(isActive:), silently
+/// no-ops even though the bound state does update). iPhone has no NavigationSplitView and
+/// the plain NavigationLink works there, so this is an opt-in override: nil here preserves
+/// that working default, and iPad's MainSplitView is the one place that injects a real
+/// closure, opening the recipe as a fullScreenCover instead of a pushed destination.
+private struct MealTapActionKey: EnvironmentKey {
+    static let defaultValue: ((Meal) -> Void)? = nil
+}
+
+extension EnvironmentValues {
+    var mealTapAction: ((Meal) -> Void)? {
+        get { self[MealTapActionKey.self] }
+        set { self[MealTapActionKey.self] = newValue }
+    }
+}
+
 /// Ported from MealPlanScreen.tsx: a day-selector pill strip synced with a paged day
 /// browser. Full visual parity (meal thumbnails via Pexels, expandable ingredients) is
 /// a later design pass — this establishes the real data flow, the date picker, and the
@@ -142,6 +162,7 @@ private struct MealCardView: View {
     let meal: Meal
     let isRegular: Bool
     @State private var isExpanded = false
+    @Environment(\.mealTapAction) private var mealTapAction
 
     /// The base thumbnail size, grown further while expanded so the enlarged photo and the
     /// ingredients list (now beside it, not below the whole row) grow together — a deliberate
@@ -155,16 +176,25 @@ private struct MealCardView: View {
     /// the photo grows on expand, so it scales with the image instead of staying fixed.
     private var thumbRadius: CGFloat { thumbSize * 0.1 }
 
+    @ViewBuilder
+    private func mealLink<Label: View>(@ViewBuilder label: () -> Label) -> some View {
+        if let mealTapAction {
+            Button { mealTapAction(meal) } label: { label() }
+        } else {
+            NavigationLink(value: meal) { label() }
+        }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            NavigationLink(value: meal) {
+            mealLink {
                 MealImageView(mealName: meal.name, overrideBox: (thumbSize, thumbSize, thumbRadius))
             }
             .buttonStyle(.plain)
             .hoverEffect(.highlight)
 
             VStack(alignment: .leading, spacing: 4) {
-                NavigationLink(value: meal) {
+                mealLink {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(meal.type?.capitalized ?? "Meal")
                             .font((isRegular ? AppTypography.body : AppTypography.label).weight(.semibold))

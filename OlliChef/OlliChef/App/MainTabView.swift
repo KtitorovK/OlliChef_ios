@@ -48,17 +48,20 @@ private struct MainTabBarView: View {
 /// The net-new iPad piece: a persistent sidebar (pointer/trackpad hover support comes
 /// free from `List`/`NavigationSplitView` on iPad) plus a detail pane showing the
 /// selected section full-size, rather than a bottom tab bar eating vertical space iPad
-/// has plenty of. The detail column owns its own `NavigationStack` + toolbar +
-/// navigationDestinations so pushes (a meal → its recipe, the profile icon) stay scoped
-/// to that column and the sidebar stays visible — mirrors RootView's outer stack
-/// deliberately rather than sharing it, since two competing `NavigationLink` targets
-/// across a `NavigationSplitView` boundary is exactly the kind of ambiguity that broke
-/// hit-testing the last time this app nested stacks carelessly.
+/// has plenty of. A meal or the profile icon opens as a `fullScreenCover` rather than a
+/// pushed destination — see the `selectedMeal`/`isShowingProfile` comment below for why.
 private struct MainSplitView: View {
     @EnvironmentObject private var router: TabRouter
     @EnvironmentObject private var authState: AuthState
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
-    @State private var showingProfile = false
+    // Every push mechanism tried here — NavigationPath.append, navigationDestination(item:),
+    // navigationDestination(isPresented:), even the legacy NavigationLink(isActive:) — silently
+    // no-ops inside this NavigationSplitView's detail column on this Xcode 26.4/iOS 26.4 SDK,
+    // confirmed live with a visible tap counter: the bound state updates every time, but no
+    // push ever renders. A fullScreenCover sidesteps NavigationStack's push machinery entirely
+    // (it's a plain modal presentation), so it isn't affected by whatever the underlying bug is.
+    @State private var selectedMeal: Meal?
+    @State private var isShowingProfile = false
 
     /// iOS's `List(selection:)` needs an optional binding (unlike macOS's non-optional
     /// overload); nil sets are ignored since some section should always stay selected.
@@ -70,33 +73,50 @@ private struct MainSplitView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             sidebar
         } detail: {
-            NavigationStack {
-                detailView
-                    .navigationTitle(router.selection.title)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .navigationDestination(for: Meal.self) { meal in
-                        RecipeStoryScreen(meal: meal)
-                    }
-            }
+            // NavigationSplitView's detail column already manages its own navigation
+            // stack — wrapping it in an explicit NavigationStack created a second,
+            // nested stack whose pushes never actually reached the screen (confirmed
+            // live: state updates, a hidden NavigationLink(isActive:) fires, nothing
+            // renders). Attaching navigationDestination directly to the column's root
+            // content, with no extra NavigationStack, is what the API expects here.
+            detailView
+                .navigationTitle(router.selection.title)
+                .navigationBarTitleDisplayMode(.inline)
+                .environment(\.mealTapAction) { meal in
+                    selectedMeal = meal
+                }
         }
         .tint(AppColor.brandPrimary)
         .navigationSplitViewStyle(.balanced)
-        .sheet(isPresented: $showingProfile) {
+        .fullScreenCover(item: $selectedMeal) { meal in
             NavigationStack {
-                UserProfileScreen()
+                RecipeStoryScreen(meal: meal)
                     .toolbar {
-                        // An iPad sheet has no swipe-down affordance like iPhone's grabber —
-                        // without an explicit close control there's no way to dismiss it.
-                        ToolbarItem(placement: .topBarTrailing) {
+                        ToolbarItem(placement: .topBarLeading) {
                             Button {
-                                showingProfile = false
+                                selectedMeal = nil
                             } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(AppColor.textSecondary)
+                                Label("Back", systemImage: "chevron.backward")
                             }
                         }
                     }
             }
+            .tint(AppColor.brandPrimary)
+        }
+        .fullScreenCover(isPresented: $isShowingProfile) {
+            NavigationStack {
+                UserProfileScreen()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                isShowingProfile = false
+                            } label: {
+                                Label("Back", systemImage: "chevron.backward")
+                            }
+                        }
+                    }
+            }
+            .tint(AppColor.brandPrimary)
         }
     }
 
@@ -141,7 +161,7 @@ private struct MainSplitView: View {
 
     private var accountRow: some View {
         Button {
-            showingProfile = true
+            isShowingProfile = true
         } label: {
             HStack(spacing: 12) {
                 Circle()
@@ -192,23 +212,24 @@ private struct MainSplitView: View {
     /// time the sidebar selection changes — unlike the iPhone `TabView` above, which keeps
     /// all three tabs alive, that would reset each screen's `@StateObject` view model and
     /// re-run its `.task` load (a fresh Firestore fetch, fresh Pexels image fetches) on
-    /// every single tap. All three stay mounted permanently instead; only visibility and
-    /// hit-testing switch, so a screen's state and its already-loaded data persist exactly
-    /// like the iPhone tab bar's.
+    /// every single tap.
+    ///
+    /// First attempt was a manual `ZStack` with opacity/allowsHitTesting/zIndex toggling —
+    /// looked right, but on iPad the topmost-in-z-order screen's `List`/`ScrollView` kept
+    /// intercepting taps meant for whatever was underneath even while hidden, silently
+    /// swallowing every attempt to open a recipe from Meal Plan (SwiftUI's `zIndex` reorders
+    /// rendering, but apparently not the underlying UIScrollView hit-testing for a hidden
+    /// sibling). Confirmed iPad-only: the identical tap worked immediately on iPhone's own
+    /// `TabView`. Reusing that same `TabView` here — Apple's own real view-controller-backed
+    /// implementation for "keep every tab alive, show one at a time" — sidesteps the bug
+    /// entirely instead of re-fighting SwiftUI's hit-testing by hand; its own tab bar is
+    /// hidden since the sidebar is what actually drives `router.selection` here.
     private var detailView: some View {
-        ZStack {
-            ChatScreen()
-                .opacity(router.selection == .chat ? 1 : 0)
-                .allowsHitTesting(router.selection == .chat)
-                .accessibilityHidden(router.selection != .chat)
-            MealPlanScreen()
-                .opacity(router.selection == .mealPlan ? 1 : 0)
-                .allowsHitTesting(router.selection == .mealPlan)
-                .accessibilityHidden(router.selection != .mealPlan)
-            GroceryListScreen()
-                .opacity(router.selection == .groceries ? 1 : 0)
-                .allowsHitTesting(router.selection == .groceries)
-                .accessibilityHidden(router.selection != .groceries)
+        TabView(selection: $router.selection) {
+            ChatScreen().tag(MainTab.chat)
+            MealPlanScreen().tag(MainTab.mealPlan)
+            GroceryListScreen().tag(MainTab.groceries)
         }
+        .toolbar(.hidden, for: .tabBar)
     }
 }

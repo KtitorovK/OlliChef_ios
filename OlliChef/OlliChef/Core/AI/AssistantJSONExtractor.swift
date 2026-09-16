@@ -72,8 +72,25 @@ nonisolated enum AssistantJSONExtractor {
         return true
     }
 
+    /// The model occasionally drops the "unit" key partway through a long ingredient
+    /// list — e.g. `"amount": 1, "can"` instead of `"amount": 1, "unit": "can"` —
+    /// which is invalid JSON (a bare value with no key) and fails parsing outright.
+    /// Confirmed live: prompt instructions reduce this but don't eliminate it on long
+    /// responses, so repair the one specific shape before parsing rather than losing
+    /// the whole meal plan to one dropped key several ingredients deep.
+    private static func repairMissingUnitKey(_ text: String) -> String {
+        let pattern = #""amount"(\s*:\s*-?\d+(?:\.\d+)?)\s*,\s*"([^"]+)"(\s*\})"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(
+            in: text,
+            range: range,
+            withTemplate: #""amount"$1, "unit": "$2"$3"#
+        )
+    }
+
     private static func attemptParse(_ candidate: String) -> [String: Any]? {
-        guard let data = candidate.data(using: .utf8) else { return nil }
+        guard let data = repairMissingUnitKey(candidate).data(using: .utf8) else { return nil }
         return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 }

@@ -15,6 +15,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         ErrorService.initializeCrashlytics()
         resetStateForUITestingIfNeeded()
+        // Fire-and-forget: PromptManager's accessors already fall back to safe local
+        // defaults (DefaultPrompts) if this hasn't finished yet, so launch never blocks
+        // on it — but without calling this at all, Remote Config is never fetched and
+        // every prompt (and the ai_model parameter) silently uses the local default
+        // forever. That was true here and, it turns out, in the RN app too — its own
+        // initializeRemoteConfig() is exported but never called from anywhere either.
+        Task {
+            try? await PromptManager.shared.initialize()
+        }
         return true
     }
 

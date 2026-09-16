@@ -7,7 +7,6 @@ import Foundation
 actor RecipeService {
     static let shared = RecipeService()
 
-    private static let model = "gpt-4o-mini"
     private static let cachePrefix = "recipe_story_"
     private static let expirationSeconds: TimeInterval = 24 * 60 * 60
 
@@ -74,17 +73,17 @@ actor RecipeService {
         }
 
         let systemPrompt = await PromptManager.shared.recipePrompt()
+        let model = await PromptManager.shared.aiModel()
 
         var request = URLRequest(url: URL(string: "\(Secrets.firebaseOpenAIProxyURL)/chat/completions")!)
         request.httpMethod = "POST"
         request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "model": Self.model,
+            "model": model,
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": Self.storyPrompt(for: meal)],
             ],
-            "max_tokens": 800,
-            "temperature": 0.5,
+            "max_completion_tokens": 800,
             "stream": false,
         ])
 

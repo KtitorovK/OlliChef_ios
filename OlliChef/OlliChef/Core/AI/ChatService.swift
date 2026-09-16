@@ -53,12 +53,6 @@ enum ChatServiceError: Error {
 actor ChatService {
     static let shared = ChatService()
 
-    /// The Assistants API's model choice lived on the now-deleted dashboard Assistant
-    /// object, with no record of it in code. Defaulting to gpt-4o-mini for consistency
-    /// with the rest of the app's AI calls (recipe/grocery) — confirm if the old
-    /// Assistant used something else.
-    private static let model = "gpt-4o-mini"
-
     private let client = APIClient(serviceName: "ChatService")
     private var currentConversationId: String?
     private var createConversationTask: Task<String, Error>?
@@ -125,13 +119,14 @@ actor ChatService {
 
         let conversationId = try await getOrCreateConversation()
         let instructions = await PromptManager.shared.dynamicPrompt()
+        let model = await PromptManager.shared.aiModel()
 
         let (data, _) = try await RetryHelpers.retryRequest {
             try await self.client.send(self.baseRequest(
                 path: "/responses",
                 method: "POST",
                 body: [
-                    "model": Self.model,
+                    "model": model,
                     "instructions": instructions,
                     "input": [["role": "user", "content": message]],
                     "conversation": conversationId,

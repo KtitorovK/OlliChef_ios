@@ -17,7 +17,7 @@ enum SessionPhase {
 /// sandbox account, and before any TestFlight/App Store build. While `true`, the
 /// subscription gate is skipped entirely so the rest of the app can be tested without
 /// completing a purchase every time.
-let bypassPaywallForTesting = false
+let bypassPaywallForTesting = true
 
 struct RootView: View {
     @StateObject private var authState = AuthState()

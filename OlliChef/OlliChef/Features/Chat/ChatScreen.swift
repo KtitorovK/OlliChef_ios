@@ -161,6 +161,9 @@ private struct MealPlanCard: View {
     let isAccepting: Bool
     let onAccept: () -> Void
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var isRegular: Bool { horizontalSizeClass == .regular }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ForEach(mealPlan.days, id: \.date) { day in
@@ -215,6 +218,11 @@ private struct MealPlanCard: View {
             RoundedRectangle(cornerRadius: AppRadius.medium)
                 .stroke(AppColor.border, lineWidth: 1)
         }
+        // On iPad's much wider detail column this card had no cap at all and stretched
+        // edge-to-edge, unlike every other message bubble in the thread — capping it at
+        // the same 640pt MealPlanScreen already uses keeps it reading as a contained
+        // card. iPhone keeps filling the available width since it was never too wide there.
+        .frame(maxWidth: isRegular ? 640 : .infinity, alignment: .leading)
     }
 
     private func mealRow(_ meal: Meal) -> some View {

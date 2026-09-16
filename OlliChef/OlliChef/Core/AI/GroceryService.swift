@@ -8,7 +8,6 @@ import Foundation
 actor GroceryService {
     static let shared = GroceryService()
 
-    private static let model = "gpt-4o-mini"
     private let client = APIClient(serviceName: "GroceryService")
 
     private init() {}
@@ -190,6 +189,7 @@ actor GroceryService {
 
     private func callAIConversion(ingredients: [DisplayItem], userHas: [String]) async throws -> [AIGroceryItem] {
         let systemPrompt = await PromptManager.shared.groceryPrompt()
+        let model = await PromptManager.shared.aiModel()
 
         let ingredientsJSON = ingredients.map { item -> [String: Any] in
             ["name": item.name, "amount": item.amount, "unit": item.unit, "category": item.category]
@@ -201,13 +201,12 @@ actor GroceryService {
         var request = URLRequest(url: URL(string: "\(Secrets.firebaseOpenAIProxyURL)/chat/completions")!)
         request.httpMethod = "POST"
         request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "model": Self.model,
+            "model": model,
             "messages": [
                 ["role": "system", "content": systemPrompt],
                 ["role": "user", "content": userContentString],
             ],
-            "max_tokens": 1500,
-            "temperature": 0.2,
+            "max_completion_tokens": 1500,
         ])
 
         let (data, _) = try await RetryHelpers.retryRequest {

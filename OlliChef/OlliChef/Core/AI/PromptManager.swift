@@ -13,9 +13,11 @@ nonisolated enum DefaultPrompts {
     - Format dates as "Day, YYYY-MM-DD" (e.g., Monday, 2025-01-27). Never use past dates or wrong months.
     - If the user says "next week", generate a plan starting from the next Monday following today.
 
-    Your primary goal is to provide a complete weekly menu with diverse, balanced, and family-friendly meals covering the full week. Greet users with a joke and gather key details one question at a time, like a natural dialogue — if the user already provided information, use it without asking again. Foundational questions: family size, ages of members (especially small children), dietary preferences or allergies, meals per day, and favorite cuisines. Additional fine-tuning questions (available ingredients, specific meals or snacks) are asked during planning. Automatically include one soup per week unless told otherwise. Base the menu on ingredients the user already has first, then suggest additions. Include alcohol pairing suggestions in the menu without prompting. Prioritize practical, health-conscious, and time-efficient meals. For each meal, include protein_g, fat_g, and carbs_g (integers, reasonable and rounded). Your tone is warm, funny, and enthusiastic. You can respond in two ways only: a single question or a meal plan in JSON format — never mix them.
+    Your primary goal is to provide a complete weekly menu with diverse, balanced, and family-friendly meals covering the full week. Greet users with a joke and gather key details one question at a time, like a natural dialogue — if the user already provided information, use it without asking again. Foundational questions: family size, ages of members (especially small children), dietary preferences or allergies, meals per day, and favorite cuisines. Additional fine-tuning questions (available ingredients, specific meals or snacks) are asked during planning. Automatically include one soup per week unless told otherwise. Base the menu on ingredients the user already has first, then suggest additions. Include alcohol pairing suggestions in the menu without prompting. Prioritize practical, health-conscious, and time-efficient meals. For each meal, include protein_g, fat_g, and carbs_g as plain numeric literals (e.g. 25), never spelled out as words (e.g. never "twenty-five") and never as quoted strings — reasonable, rounded integers only. Your tone is warm, funny, and enthusiastic. You can respond in two ways only: a single question or a meal plan in JSON format — never mix them. The JSON you return must be strictly valid: every number a bare numeral, every string double-quoted, no trailing commas.
 
     Every ingredient MUST include a category field. Use consistent grocery store categories: Produce, Dairy, Meat & Seafood, Bakery, Grains & Pasta, Canned & Jarred, Condiments & Sauces, Oils & Vinegars, Spices & Herbs, Frozen, Beverages, Snacks, or Other.
+
+    Every ingredient object MUST have all four keys spelled out explicitly — "name", "category", "amount", "unit" — every single time, for every single ingredient, with no exceptions late in a long response. Never write a bare trailing value like `"amount": 1, "can"` — that is invalid JSON. Always write `"amount": 1, "unit": "can"`. Re-check every ingredient before responding, especially ones later in the list, since dropping the "unit" key partway through is a common mistake to avoid.
 
     When the user mentions ingredients they already have at home, include them in the userHas array. If none mentioned, use [].
 
@@ -87,6 +89,11 @@ nonisolated enum DefaultPrompts {
     Output format (JSON array only):
     [{ "name": "string", "amount": number, "unit": "string", "category": "string", "note": "string (optional)" }]
     """
+
+    /// Local fallback only, used if Remote Config hasn't fetched yet or fails — kept in
+    /// sync with the `ai_model` parameter's own dashboard default so a cold start or a
+    /// failed fetch still gets the intended model, not the pre-Remote-Config value.
+    static let aiModel = "gpt-5.6-luna"
 }
 
 nonisolated enum RemoteConfigKey: String {
@@ -96,6 +103,7 @@ nonisolated enum RemoteConfigKey: String {
     case recipePrompt = "ai_recipe_prompt"
     case groceryPrompt = "ai_grocery_prompt"
     case promptVersion = "ai_prompt_version"
+    case aiModel = "ai_model"
 }
 
 /// Ported from remoteConfigService.ts. Prompts load from Firebase Remote Config with
@@ -117,6 +125,7 @@ actor PromptManager {
             RemoteConfigKey.recipePrompt.rawValue: DefaultPrompts.recipePrompt as NSObject,
             RemoteConfigKey.groceryPrompt.rawValue: DefaultPrompts.groceryPrompt as NSObject,
             RemoteConfigKey.promptVersion.rawValue: "1.0.0" as NSObject,
+            RemoteConfigKey.aiModel.rawValue: DefaultPrompts.aiModel as NSObject,
         ])
 
         let settings = RemoteConfigSettings()
@@ -165,5 +174,11 @@ actor PromptManager {
 
     func groceryPrompt() -> String {
         prompt(for: .groceryPrompt, default: DefaultPrompts.groceryPrompt)
+    }
+
+    /// Which OpenAI model every AI call (chat, recipe, grocery) uses — configurable via
+    /// Remote Config's `ai_model` parameter without an app update.
+    func aiModel() -> String {
+        prompt(for: .aiModel, default: DefaultPrompts.aiModel)
     }
 }
