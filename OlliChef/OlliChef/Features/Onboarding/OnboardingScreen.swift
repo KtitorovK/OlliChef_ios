@@ -14,7 +14,6 @@ struct OnboardingScreen: View {
     let onComplete: () -> Void
 
     @State private var index = 0
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var isIPad: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
@@ -57,8 +56,8 @@ struct OnboardingScreen: View {
             HStack {
                 Spacer()
                 Button("Skip", action: onComplete)
-                    .font(AppTypography.subhead.weight(.medium))
-                    .foregroundStyle(AppColor.brandPrimary)
+                    .font(AppTypography.cardTitle.weight(.medium))
+                    .foregroundStyle(AppColor.brandAction)
                     .accessibilityIdentifier("onboarding.skip")
             }
             .padding(.horizontal, 16)
@@ -75,7 +74,7 @@ struct OnboardingScreen: View {
                 HStack(spacing: 8) {
                     ForEach(slides.indices, id: \.self) { i in
                         Capsule()
-                            .fill(i == index ? AppColor.brandPrimary : AppColor.textSecondary.opacity(0.35))
+                            .fill(i == index ? AppColor.brandAction : AppColor.textSecondary.opacity(0.35))
                             .frame(width: i == index ? 20 : 8, height: 8)
                     }
                 }
@@ -86,7 +85,7 @@ struct OnboardingScreen: View {
                         .foregroundStyle(AppColor.textOnBrand)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(AppColor.brandPrimary)
+                        .background(AppColor.brandAction)
                         .clipShape(RoundedRectangle(cornerRadius: AppRadius.large))
                 }
                 .padding(.horizontal, isIPad ? 48 : AppSpacing.contentPadding)
@@ -115,7 +114,7 @@ struct OnboardingScreen: View {
                 .frame(maxHeight: .infinity)
 
             Text(slide.headline)
-                .font(AppTypography.title.weight(.bold))
+                .font(AppTypography.pageTitle)
                 .foregroundStyle(AppColor.textPrimary)
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("onboarding.headline")

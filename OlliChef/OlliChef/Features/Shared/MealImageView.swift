@@ -64,7 +64,7 @@ struct MealImageView: View {
     private var content: some View {
         if isLoading {
             placeholderTile {
-                ProgressView().tint(AppColor.brandPrimary)
+                ProgressView().tint(AppColor.brandAccent)
             }
         } else if let imageURL, let url = URL(string: imageURL) {
             AsyncImage(url: url) { phase in
@@ -89,7 +89,7 @@ struct MealImageView: View {
 
     private func placeholderTile<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         RoundedRectangle(cornerRadius: boxRadius)
-            .fill(AppColor.cardSurface)
+            .fill(AppColor.surfaceCard)
             .overlay(content())
     }
 }

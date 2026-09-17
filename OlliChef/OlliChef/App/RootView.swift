@@ -22,9 +22,17 @@ let bypassPaywallForTesting = true
 struct RootView: View {
     @StateObject private var authState = AuthState()
     @StateObject private var subscriptionState = SubscriptionState()
+    // Owned here rather than inside MainTabView so it's in scope for UserProfileScreen
+    // too: on iPhone, Profile is pushed via a navigationDestination attached to this
+    // same outer NavigationStack — a sibling of MainTabView, not a descendant — so an
+    // environmentObject set only inside MainTabView's own body never reaches it there
+    // (iPad's fullScreenCover path happened to work either way, since covers inherit
+    // the presenting view's environment).
+    @StateObject private var tabRouter = TabRouter()
     @AppStorage("onboarding.completed") private var onboardingComplete = false
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var showingClearMealPlanConfirm = false
 
     private var phase: SessionPhase {
         guard authState.isInitialized else { return .loading }
@@ -37,7 +45,7 @@ struct RootView: View {
             switch phase {
             case .loading:
                 ProgressView()
-                    .tint(AppColor.brandPrimary)
+                    .tint(AppColor.brandAction)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(AppColor.surfaceBody)
 
@@ -53,12 +61,18 @@ struct RootView: View {
         }
         .environmentObject(authState)
         .environmentObject(subscriptionState)
+        .environmentObject(tabRouter)
         .task(id: authState.user?.uid) {
             await subscriptionState.start(for: authState.user?.uid)
         }
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 Task { await subscriptionState.handleAppForeground() }
+                // Retries Remote Config if launch never got a live fetch (e.g. no
+                // network at cold start) or it's been over an hour — silent by design,
+                // since "still offline" on a background retry isn't an actionable
+                // error the way a first-ever launch failure is (see AppDelegate).
+                Task { try? await PromptManager.shared.refreshIfNeeded() }
             }
         }
     }
@@ -70,7 +84,7 @@ struct RootView: View {
     private var mainContent: some View {
         if subscriptionState.isLoading {
             ProgressView()
-                .tint(AppColor.brandPrimary)
+                .tint(AppColor.brandAction)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AppColor.surfaceBody)
         } else if !subscriptionState.hasAccess && !bypassPaywallForTesting {
@@ -85,10 +99,29 @@ struct RootView: View {
             // as before.
             NavigationStack {
                 MainTabView()
-                    .navigationTitle(horizontalSizeClass == .regular ? "" : "OlliChef")
+                    // Was always "OlliChef" on iPhone regardless of tab; the nav bar
+                    // now reflects whichever screen is actually showing, matching how
+                    // iPad's own sidebar detail column already titles itself.
+                    .navigationTitle(horizontalSizeClass == .regular ? "" : tabRouter.selection.title)
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         if horizontalSizeClass != .regular {
+                            if tabRouter.selection == .mealPlan, tabRouter.hasMealPlan {
+                                ToolbarItem(placement: .topBarLeading) {
+                                    Button {
+                                        showingClearMealPlanConfirm = true
+                                    } label: {
+                                        Image(systemName: "arrow.counterclockwise")
+                                    }
+                                }
+                            }
+                            if tabRouter.selection == .groceries, let shareText = tabRouter.groceryShareText {
+                                ToolbarItem(placement: .topBarTrailing) {
+                                    ShareLink(item: shareText) {
+                                        Image(systemName: "square.and.arrow.up")
+                                    }
+                                }
+                            }
                             ToolbarItem(placement: .topBarTrailing) {
                                 NavigationLink(value: ProfileRoute()) {
                                     Image("IconProfile")
@@ -105,8 +138,14 @@ struct RootView: View {
                     .navigationDestination(for: ProfileRoute.self) { _ in
                         UserProfileScreen()
                     }
+                    .alert("Clear Current Meal Plan", isPresented: $showingClearMealPlanConfirm) {
+                        Button("Cancel", role: .cancel) {}
+                        Button("Clear", role: .destructive) { tabRouter.requestMealPlanClear = Date() }
+                    } message: {
+                        Text("Are you sure you want to clear the current meal plan?")
+                    }
             }
-            .tint(AppColor.brandPrimary)
+            .tint(AppColor.brandAction)
         }
     }
 }

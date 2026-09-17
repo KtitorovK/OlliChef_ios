@@ -26,15 +26,11 @@ extension EnvironmentValues {
 /// Firestore contract.
 struct MealPlanScreen: View {
     @StateObject private var viewModel = MealPlanViewModel()
+    @EnvironmentObject private var tabRouter: TabRouter
     @State private var selectedDate: String?
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    /// Mirrors MealPlanScreen.tsx's own `isTablet` branch (thumb 100→130, caption→body,
-    /// subhead→headline, 16→32 padding) — real RN tablet sizing that got dropped when this
-    /// screen was first ported, not an invented iPad-only feature. RN never restructures
-    /// into a grid on tablet, so this stays a single column, just bigger and better spaced,
-    /// rather than filling the split-view detail pane's extra room with new content.
-    private var isRegular: Bool { horizontalSizeClass == .regular }
+    private var metrics: AppMetrics { AppMetrics(horizontalSizeClass: horizontalSizeClass) }
 
     var body: some View {
         Group {
@@ -63,14 +59,36 @@ struct MealPlanScreen: View {
             }
         }
         .refreshable { await viewModel.load() }
+        .onChange(of: viewModel.mealPlan?.id) {
+            tabRouter.hasMealPlan = viewModel.mealPlan != nil
+        }
+        // A .toolbar declared here never renders on either platform: this screen lives
+        // inside MainTabView's TabView with no NavigationStack of its own, and toolbar
+        // content from a TabView child doesn't propagate to an ancestor's navigation bar
+        // (confirmed live — Groceries' own pre-existing ShareLink toolbar button has the
+        // identical, previously unnoticed problem). The "Clear Current Meal Plan" button
+        // is declared instead at each platform's outer navigation level (RootView for
+        // iPhone, MainSplitView for iPad, next to where the Profile button already lives
+        // for the same reason) and signals here via TabRouter.requestMealPlanClear.
+        .onChange(of: tabRouter.requestMealPlanClear) {
+            Task { await viewModel.clearMealPlan(router: tabRouter) }
+        }
+        .alert("Error", isPresented: .constant(viewModel.clearError != nil), presenting: viewModel.clearError) { _ in
+            Button("OK") { viewModel.clearError = nil }
+        } message: { message in
+            Text(message)
+        }
     }
 
     /// Mirrors renderDaySelector: a horizontal strip of date pills, auto-scrolling to
     /// keep the selected pill in view, that drives the paged day browser below it.
+    /// Selected uses BrandForest (a strong, deliberate selection color); unselected
+    /// pills use the subtle BrandTint instead of the same saturated green repeated
+    /// across every day, which read as one undifferentiated bright-green block.
     private func daySelector(_ mealPlan: MealPlan) -> some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: metrics.dayChipGap) {
                     ForEach(mealPlan.days, id: \.date) { day in
                         let isSelected = day.date == selectedDate
                         Button {
@@ -78,20 +96,21 @@ struct MealPlanScreen: View {
                         } label: {
                             VStack(spacing: 2) {
                                 Text(day.pillWeekdayLabel)
-                                    .font(AppTypography.caption.weight(.semibold))
+                                    .font(AppTypography.smallMetadata.weight(.semibold))
                                 Text(day.pillDateLabel)
-                                    .font(AppTypography.label.weight(.medium))
+                                    .font(AppTypography.tabLabel)
                             }
-                            .foregroundStyle(isSelected ? AppColor.textOnBrand : AppColor.textPrimary)
-                            .frame(width: 56, height: 60)
-                            .background(isSelected ? AppColor.brandSecondary : AppColor.brandPrimary)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .foregroundStyle(isSelected ? AppColor.textOnBrand : AppColor.brandForest)
+                            .frame(width: metrics.dayChipWidth, height: metrics.dayChipHeight)
+                            .background(isSelected ? AppColor.brandForest : AppColor.brandTint)
+                            .clipShape(RoundedRectangle(cornerRadius: metrics.dayChipRadius))
                         }
                         .hoverEffect(.highlight)
                         .id(day.date)
+                        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, AppSpacing.md)
             }
             .frame(height: 80)
             .background(AppColor.surfaceHeader)
@@ -110,13 +129,26 @@ struct MealPlanScreen: View {
                 .scaledToFit()
                 .frame(maxHeight: 240)
             Text("No meal plan yet")
-                .font(AppTypography.subhead.weight(.semibold))
+                .font(AppTypography.cardTitle)
                 .foregroundStyle(AppColor.textPrimary)
             Text("Ask Olli in Chat to plan your week")
                 .font(AppTypography.body)
                 .foregroundStyle(AppColor.textSecondary)
+                .multilineTextAlignment(.center)
+            // Mirrors GroceryListScreen's own empty-state "Create New List" button —
+            // same call to action (jump to Chat), same styling.
+            Button("Create Meal Plan") {
+                tabRouter.selection = .chat
+            }
+            .font(AppTypography.button)
+            .foregroundStyle(AppColor.textOnBrand)
+            .padding(.horizontal, AppSpacing.buttonHorizontal)
+            .frame(minHeight: metrics.primaryButtonHeight)
+            .background(AppColor.brandAction)
+            .clipShape(Capsule())
         }
         .padding(AppSpacing.contentPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func dayView(_ day: DayMeals) -> some View {
@@ -124,27 +156,27 @@ struct MealPlanScreen: View {
             VStack(alignment: .leading, spacing: AppSpacing.contentPadding) {
                 HStack {
                     Text(day.fullWeekdayLabel)
-                        .font(AppTypography.headline.weight(.semibold))
+                        .font(AppTypography.pageTitle)
                         .foregroundStyle(AppColor.textPrimary)
                     if day.isToday {
                         Text("Today")
-                            .font(AppTypography.label.weight(.semibold))
+                            .font(AppTypography.tabLabel)
                             .foregroundStyle(AppColor.textOnBrand)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(AppColor.brandPrimary)
+                            .padding(.horizontal, AppSpacing.xs)
+                            .padding(.vertical, AppSpacing.xxs)
+                            .background(AppColor.brandAccent)
                             .clipShape(Capsule())
                     }
                     Spacer()
                 }
 
                 ForEach(day.meals) { meal in
-                    MealCardView(meal: meal, isRegular: isRegular)
+                    MealCardView(meal: meal, metrics: metrics)
                 }
             }
             .padding(.vertical, AppSpacing.contentPadding)
-            .padding(.horizontal, isRegular ? 32 : AppSpacing.contentPadding)
-            .frame(maxWidth: 640, alignment: .leading)
+            .padding(.horizontal, metrics.screenPadding)
+            .frame(maxWidth: metrics.mealPlanContentMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
     }
@@ -160,7 +192,7 @@ struct MealPlanScreen: View {
 /// text without being swallowed by either link's hit area.
 private struct MealCardView: View {
     let meal: Meal
-    let isRegular: Bool
+    let metrics: AppMetrics
     @State private var isExpanded = false
     @Environment(\.mealTapAction) private var mealTapAction
 
@@ -168,13 +200,12 @@ private struct MealCardView: View {
     /// ingredients list (now beside it, not below the whole row) grow together — a deliberate
     /// per-user-request deviation from RN, which never resizes the thumbnail on expand.
     private var thumbSize: CGFloat {
-        let base: CGFloat = isRegular ? 130 : 100
-        return isExpanded ? base * 1.6 : base
+        isExpanded ? metrics.mealImageSize * 1.6 : metrics.mealImageSize
     }
 
-    /// A fixed 8pt radius (fine at the base thumbnail size) reads as barely-rounded once
-    /// the photo grows on expand, so it scales with the image instead of staying fixed.
-    private var thumbRadius: CGFloat { thumbSize * 0.1 }
+    private var thumbRadius: CGFloat {
+        isExpanded ? AppRadius.image * 1.6 : AppRadius.image
+    }
 
     @ViewBuilder
     private func mealLink<Label: View>(@ViewBuilder label: () -> Label) -> some View {
@@ -186,25 +217,25 @@ private struct MealCardView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .top, spacing: AppSpacing.md) {
             mealLink {
                 MealImageView(mealName: meal.name, overrideBox: (thumbSize, thumbSize, thumbRadius))
             }
             .buttonStyle(.plain)
             .hoverEffect(.highlight)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: AppSpacing.xxs) {
                 mealLink {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: AppSpacing.xxs) {
                         Text(meal.type?.capitalized ?? "Meal")
-                            .font((isRegular ? AppTypography.body : AppTypography.label).weight(.semibold))
+                            .font(AppTypography.metadata.weight(.semibold))
                             .foregroundStyle(AppColor.textSecondary)
                         Text(meal.name)
-                            .font((isRegular ? AppTypography.headline : AppTypography.subhead).weight(.medium))
+                            .font(AppTypography.cardTitle)
                             .foregroundStyle(AppColor.textPrimary)
                         if let nutrition = meal.nutritionInfo {
                             Text(nutrition.summaryText)
-                                .font(isRegular ? AppTypography.body : AppTypography.caption)
+                                .font(AppTypography.metadata)
                                 .foregroundStyle(AppColor.textSecondary)
                         }
                     }
@@ -217,24 +248,25 @@ private struct MealCardView: View {
                         withAnimation { isExpanded.toggle() }
                     } label: {
                         Text(isExpanded ? "Hide Details" : "View Details")
-                            .font(isRegular ? AppTypography.body : AppTypography.caption)
-                            .foregroundStyle(AppColor.brandPrimary)
+                            .font(AppTypography.metadata.weight(.medium))
+                            .foregroundStyle(AppColor.brandAction)
                             .underline()
                     }
                     .buttonStyle(.plain)
                     .hoverEffect(.highlight)
+                    .accessibilityLabel(isExpanded ? "Hide ingredient details" : "View ingredient details")
                 }
 
                 if isExpanded, !meal.ingredients.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: AppSpacing.xxs) {
                         Divider()
-                            .padding(.bottom, 4)
+                            .padding(.bottom, AppSpacing.xxs)
                         Text("Ingredients:")
-                            .font(AppTypography.caption)
+                            .font(AppTypography.smallMetadata)
                             .foregroundStyle(AppColor.textSecondary)
                         ForEach(Array(meal.ingredients.enumerated()), id: \.offset) { _, ingredient in
                             Text("• \(ingredient.name)")
-                                .font(AppTypography.label)
+                                .font(AppTypography.smallMetadata)
                                 .foregroundStyle(AppColor.textSecondary)
                         }
                     }
@@ -243,8 +275,8 @@ private struct MealCardView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(isRegular ? 20 : 14)
-        .background(AppColor.cardSurface)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium))
+        .padding(metrics.cardPadding)
+        .background(AppColor.surfaceCard)
+        .clipShape(RoundedRectangle(cornerRadius: metrics.cardRadius))
     }
 }

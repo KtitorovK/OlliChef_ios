@@ -15,7 +15,7 @@ struct AuthScreen: View {
 
             Text("OlliChef")
                 .font(AppTypography.displayXL.weight(.bold))
-                .foregroundStyle(AppColor.brandSecondary)
+                .foregroundStyle(AppColor.brandForest)
                 .accessibilityIdentifier("auth.title")
 
             Text("Your AI chef for easy meal planning")
@@ -27,7 +27,7 @@ struct AuthScreen: View {
 
             if let errorMessage {
                 Text(errorMessage)
-                    .font(AppTypography.caption)
+                    .font(AppTypography.smallMetadata)
                     .foregroundStyle(AppColor.statusError)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, AppSpacing.contentPadding)

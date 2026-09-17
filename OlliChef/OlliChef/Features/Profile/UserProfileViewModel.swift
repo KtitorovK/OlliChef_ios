@@ -120,12 +120,13 @@ final class UserProfileViewModel: ObservableObject {
 
     // MARK: - Account actions
 
-    func clearChatHistory() async {
+    func clearChatHistory(router: TabRouter) async {
         isClearingChat = true
         defer { isClearingChat = false }
 
         do {
             _ = try await ChatService.shared.resetChatConversation()
+            router.chatHistoryClearedAt = Date()
             alert = ("Success", "Chat history has been cleared successfully")
         } catch {
             handleError(error, context: ErrorContext(location: "UserProfileScreen", action: "clear_chat_history"))

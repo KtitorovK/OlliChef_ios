@@ -8,7 +8,6 @@ actor RecipeService {
     static let shared = RecipeService()
 
     private static let cachePrefix = "recipe_story_"
-    private static let expirationSeconds: TimeInterval = 24 * 60 * 60
 
     private let client = APIClient(serviceName: "RecipeService")
     private var memoryCache: [String: (story: String, timestamp: Date)] = [:]
@@ -28,8 +27,12 @@ actor RecipeService {
         return cachePrefix + String(sanitized)
     }
 
+    /// A cached recipe stays valid through the end of the calendar week it was
+    /// generated in, then expires regardless of exact hours elapsed — a story cached
+    /// Wednesday is still good Thursday–Sunday, but stale the following Monday, since
+    /// meal plans (and the meals within them) turn over weekly.
     private static func isCacheValid(_ timestamp: Date) -> Bool {
-        Date().timeIntervalSince(timestamp) < expirationSeconds
+        Calendar.current.isDate(timestamp, equalTo: Date(), toGranularity: .weekOfYear)
     }
 
     private func cachedStory(for mealName: String) -> String? {
@@ -72,8 +75,8 @@ actor RecipeService {
             return cached
         }
 
-        let systemPrompt = await PromptManager.shared.recipePrompt()
-        let model = await PromptManager.shared.aiModel()
+        let systemPrompt = try await PromptManager.shared.recipePrompt()
+        let model = try await PromptManager.shared.requiredAIModel()
 
         var request = URLRequest(url: URL(string: "\(Secrets.firebaseOpenAIProxyURL)/chat/completions")!)
         request.httpMethod = "POST"

@@ -28,7 +28,7 @@ struct RecipeStoryScreen: View {
                     // Mirrors RN's actual order: the meal name title sits right before
                     // the AI story, after nutrition/ingredients — not at the very top.
                     Text(meal.name)
-                        .font(AppTypography.title.weight(.bold))
+                        .font(AppTypography.pageTitle)
                         .foregroundStyle(AppColor.textPrimary)
 
                     storySection
@@ -47,9 +47,9 @@ struct RecipeStoryScreen: View {
         if viewModel.isLoading {
             VStack(spacing: 8) {
                 ProgressView()
-                    .tint(AppColor.brandPrimary)
+                    .tint(AppColor.brandAccent)
                 Text("Conjuring a culinary tale…")
-                    .font(AppTypography.caption)
+                    .font(AppTypography.smallMetadata)
                     .foregroundStyle(AppColor.textSecondary)
             }
             .frame(maxWidth: .infinity)
@@ -68,7 +68,7 @@ struct RecipeStoryScreen: View {
                     VStack(alignment: .leading, spacing: 6) {
                         if let heading = section.heading {
                             Text(heading)
-                                .font(AppTypography.subhead.weight(.bold))
+                                .font(AppTypography.cardTitle)
                                 .foregroundStyle(AppColor.textPrimary)
                         }
                         if !section.body.isEmpty {
@@ -85,7 +85,7 @@ struct RecipeStoryScreen: View {
     private var ingredientsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Ingredients")
-                .font(AppTypography.subhead.weight(.bold))
+                .font(AppTypography.cardTitle)
                 .foregroundStyle(AppColor.textPrimary)
             ForEach(meal.ingredients, id: \.name) { ingredient in
                 HStack(alignment: .top, spacing: 6) {
@@ -107,17 +107,17 @@ struct RecipeStoryScreen: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity)
-        .background(AppColor.cardSurface)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium))
+        .background(AppColor.surfaceCard)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.small))
     }
 
     private func nutritionChip(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(AppTypography.subhead.weight(.bold))
+                .font(AppTypography.cardTitle)
                 .foregroundStyle(AppColor.textPrimary)
             Text(label)
-                .font(AppTypography.caption)
+                .font(AppTypography.smallMetadata)
                 .foregroundStyle(AppColor.textSecondary)
         }
         .frame(maxWidth: .infinity)

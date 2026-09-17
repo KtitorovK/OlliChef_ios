@@ -1,9 +1,16 @@
 import FirebaseRemoteConfig
 import Foundation
 
-/// Ported verbatim from remoteConfigService.ts's DEFAULT_PROMPTS — these are the
-/// fallback values if Remote Config fails; the live values still come from the same
-/// Firebase Remote Config project.
+/// Ported verbatim from remoteConfigService.ts's DEFAULT_PROMPTS. These are an
+/// emergency-only fallback, not a routine code path: every AI feature depends on
+/// network access anyway (they all call OpenAI), so there is no real "offline mode"
+/// worth silently degrading into with a possibly-stale local prompt. Chat and Recipe
+/// require a genuine Remote Config fetch before they'll run at all — see
+/// `PromptManager.requireRemote(_:)` — and surface the same offline message as any
+/// other network failure instead. Grocery's AI step is the one exception: it's an
+/// optional polish step that already falls back to a deterministic, non-AI list on
+/// any failure, so it stays lenient and may use these defaults rather than fail the
+/// whole grocery-list feature.
 nonisolated enum DefaultPrompts {
     static let dynamicPrompt = """
     You are a master chef specializing in crafting weekly meal plans for families, with a flair for humor and a love for keeping things lighthearted. Today is {{CURRENT_DATE}}.
@@ -114,6 +121,16 @@ actor PromptManager {
     private var lastRefreshTime: Date?
     private let refreshInterval: TimeInterval = 3600 // 1 hour
 
+    // `initialize()` (from AppDelegate at launch) and `refreshIfNeeded()` (from
+    // RootView's scenePhase handler, which can fire almost immediately after launch
+    // on a foreground transition) could otherwise both call Firebase's own
+    // `fetchAndActivate()` concurrently on the same RemoteConfig instance — actors
+    // allow reentrancy across `await` suspension points, so a second caller sees
+    // `lastRefreshTime` still nil/stale and starts its own fetch before the first
+    // one finishes. Tracking the in-flight fetch as a single shared Task and having
+    // every caller await *that* instead of starting their own closes the race.
+    private var inFlightFetch: Task<Void, Error>?
+
     private init() {}
 
     func initialize() async throws {
@@ -133,15 +150,26 @@ actor PromptManager {
         settings.fetchTimeout = 10
         remoteConfig.configSettings = settings
 
-        _ = try await remoteConfig.fetchAndActivate()
-        lastRefreshTime = Date()
+        try await fetchAndActivate()
     }
 
     func refreshIfNeeded() async throws {
         if let lastRefreshTime, Date().timeIntervalSince(lastRefreshTime) < refreshInterval {
             return
         }
-        _ = try await RemoteConfig.remoteConfig().fetchAndActivate()
+        try await fetchAndActivate()
+    }
+
+    private func fetchAndActivate() async throws {
+        if let inFlightFetch {
+            return try await inFlightFetch.value
+        }
+        let task = Task {
+            _ = try await RemoteConfig.remoteConfig().fetchAndActivate()
+        }
+        inFlightFetch = task
+        defer { inFlightFetch = nil }
+        try await task.value
         lastRefreshTime = Date()
     }
 
@@ -153,32 +181,65 @@ actor PromptManager {
         return value
     }
 
-    /// Mirrors getDynamicPrompt: substitutes {{CURRENT_DATE}} with today's date.
-    func dynamicPrompt() -> String {
+    /// `configValue(forKey:).source` is `.remote` only for a value that actually came
+    /// from an activated Remote Config fetch — this session's, or a previous session's
+    /// persisted activation reloaded at SDK init. It's `.default`/`.static` whenever we
+    /// never got a live value at all, which is exactly the "silently running on the
+    /// emergency local string" case Chat and Recipe should refuse rather than mask.
+    /// Reusing `URLError(.notConnectedToInternet)` here (rather than a bespoke error
+    /// type) means every existing `NetworkErrorClassifier`/offline-message call site
+    /// already handles this correctly with no further changes.
+    private func requireRemote(_ key: RemoteConfigKey) throws {
+        guard RemoteConfig.remoteConfig().configValue(forKey: key.rawValue).source == .remote else {
+            throw URLError(.notConnectedToInternet)
+        }
+    }
+
+    /// Mirrors getDynamicPrompt: substitutes {{CURRENT_DATE}} with today's date. Throws
+    /// if Remote Config has never delivered a live value — see `requireRemote(_:)`.
+    func dynamicPrompt() throws -> String {
+        try requireRemote(.dynamicPrompt)
         let raw = prompt(for: .dynamicPrompt, default: DefaultPrompts.dynamicPrompt)
         let today = ISO8601DateFormatter().string(from: Date()).prefix(10)
         return raw.replacingOccurrences(of: "{{CURRENT_DATE}}", with: String(today))
     }
 
+    /// Cosmetic only (a greeting shown before any AI call happens) — stays lenient.
     func welcomeMessage() -> String {
         prompt(for: .welcomeMessage, default: DefaultPrompts.welcomeMessage)
     }
 
+    /// Only ever shown after a real AI call has already failed — stays lenient.
     func errorRecoveryPrompt() -> String {
         prompt(for: .errorRecoveryPrompt, default: DefaultPrompts.errorRecoveryPrompt)
     }
 
-    func recipePrompt() -> String {
-        prompt(for: .recipePrompt, default: DefaultPrompts.recipePrompt)
+    /// Recipe has no degraded/offline mode, so this requires a live value — see
+    /// `requireRemote(_:)`.
+    func recipePrompt() throws -> String {
+        try requireRemote(.recipePrompt)
+        return prompt(for: .recipePrompt, default: DefaultPrompts.recipePrompt)
     }
 
+    /// Grocery's AI step is an optional polish layer — `generateGroceryListForPlan`
+    /// already falls back to a deterministic, non-AI list on any failure, so this
+    /// deliberately stays lenient rather than refusing to run offline.
     func groceryPrompt() -> String {
         prompt(for: .groceryPrompt, default: DefaultPrompts.groceryPrompt)
     }
 
     /// Which OpenAI model every AI call (chat, recipe, grocery) uses — configurable via
-    /// Remote Config's `ai_model` parameter without an app update.
+    /// Remote Config's `ai_model` parameter without an app update. Lenient variant for
+    /// Grocery's optional AI step; Chat/Recipe use `requiredAIModel()` instead.
     func aiModel() -> String {
         prompt(for: .aiModel, default: DefaultPrompts.aiModel)
+    }
+
+    /// Same value as `aiModel()`, but throws instead of silently returning the local
+    /// default when Remote Config has never delivered a live value — used by Chat and
+    /// Recipe alongside their own throwing prompt accessors.
+    func requiredAIModel() throws -> String {
+        try requireRemote(.aiModel)
+        return prompt(for: .aiModel, default: DefaultPrompts.aiModel)
     }
 }

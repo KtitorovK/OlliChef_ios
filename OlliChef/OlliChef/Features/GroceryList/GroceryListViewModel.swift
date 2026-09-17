@@ -9,6 +9,10 @@ final class GroceryListViewModel: ObservableObject {
     @Published private(set) var groupedItems: [(category: String, items: [GroceryItem])] = []
     @Published var isLoading = true
     @Published var errorMessage: String?
+    /// Categories the user has collapsed — absent means expanded, so a freshly loaded
+    /// list starts with every category open rather than needing every category name
+    /// pre-populated into this set.
+    @Published private(set) var collapsedCategories: Set<String> = []
 
     private var groceryList: GroceryList?
 
@@ -35,27 +39,22 @@ final class GroceryListViewModel: ObservableObject {
         }
     }
 
-    func isCategoryFullyChecked(_ items: [GroceryItem]) -> Bool {
-        !items.isEmpty && items.allSatisfy(\.checked)
+    func isExpanded(_ category: String) -> Bool {
+        !collapsedCategories.contains(category)
+    }
+
+    func toggleExpanded(_ category: String) {
+        if collapsedCategories.contains(category) {
+            collapsedCategories.remove(category)
+        } else {
+            collapsedCategories.insert(category)
+        }
     }
 
     func toggleItem(category: String, name: String) async {
         guard var list = groceryList,
               let index = list.items.firstIndex(where: { $0.category == category && $0.name == name }) else { return }
         list.items[index].checked.toggle()
-        groceryList = list
-        regroup()
-        await persist(list)
-    }
-
-    func toggleCategory(_ category: String) async {
-        guard var list = groceryList else { return }
-        let indices = list.items.indices.filter { list.items[$0].category == category }
-        guard !indices.isEmpty else { return }
-        let allChecked = indices.allSatisfy { list.items[$0].checked }
-        for index in indices {
-            list.items[index].checked = !allChecked
-        }
         groceryList = list
         regroup()
         await persist(list)

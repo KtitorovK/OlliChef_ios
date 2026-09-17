@@ -15,14 +15,21 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         FirebaseApp.configure()
         ErrorService.initializeCrashlytics()
         resetStateForUITestingIfNeeded()
-        // Fire-and-forget: PromptManager's accessors already fall back to safe local
-        // defaults (DefaultPrompts) if this hasn't finished yet, so launch never blocks
-        // on it — but without calling this at all, Remote Config is never fetched and
-        // every prompt (and the ai_model parameter) silently uses the local default
-        // forever. That was true here and, it turns out, in the RN app too — its own
-        // initializeRemoteConfig() is exported but never called from anywhere either.
+        // Fire-and-forget: launch never blocks on this. Without calling it at all,
+        // Remote Config is never fetched and every prompt (and the ai_model parameter)
+        // silently uses the local emergency default forever — that was true here and,
+        // it turns out, in the RN app too, whose own initializeRemoteConfig() is
+        // exported but never called from anywhere either. Chat/Recipe now refuse to run
+        // on the local default (see PromptManager.requireRemote), so a failure here is
+        // reported rather than swallowed — it's a real signal that those features will
+        // show an offline error on first use until RootView's scenePhase handler
+        // retries on the next foreground.
         Task {
-            try? await PromptManager.shared.initialize()
+            do {
+                try await PromptManager.shared.initialize()
+            } catch {
+                handleError(error, context: ErrorContext(location: "AppDelegate", action: "initializePromptManager"))
+            }
         }
         return true
     }

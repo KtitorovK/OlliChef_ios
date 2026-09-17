@@ -3,15 +3,19 @@ import SwiftUI
 
 /// Ported from UserProfileScreen.tsx and its AppProfile styles directly — matching the
 /// RN app's actual visual design (plain grouped sections with no card background, filled
-/// colored buttons) rather than substituting a native-iOS reinterpretation. Exact colors
-/// per section: saveButton/trial/restore-primary = brandPrimary, logoutButton =
-/// brandSecondary, deleteButton = statusError, clearChatButton = statusWarning.
+/// colored buttons) rather than substituting a native-iOS reinterpretation. Save/trial/
+/// restore/manage-subscription/logout all use brandAction (interactive controls);
+/// deleteButton = statusError, clearChatButton = statusWarning.
 /// The RN screen's dietary-preferences fields on `UserProfile` are never actually shown
 /// here — verified, not an oversight — so this doesn't add editing for them either.
 struct UserProfileScreen: View {
     @EnvironmentObject private var authState: AuthState
     @EnvironmentObject private var subscriptionState: SubscriptionState
+    @EnvironmentObject private var tabRouter: TabRouter
     @StateObject private var viewModel = UserProfileViewModel()
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var metrics: AppMetrics { AppMetrics(horizontalSizeClass: horizontalSizeClass) }
 
     @State private var showingClearChatConfirm = false
     @State private var showingLogoutConfirm = false
@@ -38,6 +42,8 @@ struct UserProfileScreen: View {
                 accountActionsSection
             }
             .padding(AppSpacing.contentPadding)
+            .frame(maxWidth: metrics.formContentMaxWidth)
+            .frame(maxWidth: .infinity)
         }
         .background(AppColor.surfaceBody)
         .navigationTitle("Profile")
@@ -58,7 +64,7 @@ struct UserProfileScreen: View {
         }
         .alert("Clear Chat History", isPresented: $showingClearChatConfirm) {
             Button("Cancel", role: .cancel) {}
-            Button("Clear", role: .destructive) { Task { await viewModel.clearChatHistory() } }
+            Button("Clear", role: .destructive) { Task { await viewModel.clearChatHistory(router: tabRouter) } }
         } message: {
             Text("Are you sure you want to clear your chat history? This action cannot be undone.")
         }
@@ -90,12 +96,12 @@ struct UserProfileScreen: View {
                 if viewModel.isEditingDisplayName {
                     TextField("Enter display name", text: $viewModel.displayName)
                         .padding(12)
-                        .background(AppColor.cardSurface)
-                        .overlay(RoundedRectangle(cornerRadius: AppRadius.small).stroke(AppColor.border, lineWidth: 1))
+                        .background(AppColor.surfaceCard)
+                        .overlay(RoundedRectangle(cornerRadius: AppRadius.small).stroke(AppColor.divider, lineWidth: 1))
                         .clipShape(RoundedRectangle(cornerRadius: AppRadius.small))
 
                     HStack(spacing: 8) {
-                        filledButton("Save", color: AppColor.brandPrimary) {
+                        filledButton("Save", color: AppColor.brandAction) {
                             Task { await viewModel.saveDisplayName() }
                         }
                         outlinedButton("Cancel") {
@@ -111,7 +117,7 @@ struct UserProfileScreen: View {
                         Spacer()
                         Button("Edit") { viewModel.beginEditingDisplayName() }
                             .font(AppTypography.body.weight(.medium))
-                            .foregroundStyle(AppColor.brandPrimary)
+                            .foregroundStyle(AppColor.brandAction)
                     }
                 }
             }
@@ -148,7 +154,7 @@ struct UserProfileScreen: View {
             }
 
             if hasAccess || isGrace {
-                outlinedButton("Manage Subscription", textColor: AppColor.brandPrimary, borderColor: AppColor.brandPrimary) {
+                outlinedButton("Manage Subscription", textColor: AppColor.brandAction, borderColor: AppColor.brandAction) {
                     Task { await viewModel.manageSubscription() }
                 }
             }
@@ -166,7 +172,7 @@ struct UserProfileScreen: View {
                 if let productInfo = viewModel.productInfo, productInfo.isEligibleForIntroOffer {
                     filledButton(
                         viewModel.isPurchasing ? "Processing..." : "Start your 14-day free trial",
-                        color: AppColor.brandPrimary
+                        color: AppColor.brandAction
                     ) {
                         Task { await viewModel.purchase(subscriptionState: subscriptionState) }
                     }
@@ -184,7 +190,7 @@ struct UserProfileScreen: View {
                 } else if viewModel.productInfo != nil {
                     filledButton(
                         viewModel.isRestoring ? "Restoring..." : "Restore Purchases",
-                        color: AppColor.brandPrimary
+                        color: AppColor.brandAction
                     ) {
                         Task { await viewModel.restorePurchases(subscriptionState: subscriptionState) }
                     }
@@ -221,7 +227,7 @@ struct UserProfileScreen: View {
             }
             .disabled(viewModel.isClearingChat)
 
-            filledButton("Logout", color: AppColor.brandSecondary) {
+            filledButton("Logout", color: AppColor.brandAction) {
                 showingLogoutConfirm = true
             }
 
@@ -241,7 +247,7 @@ struct UserProfileScreen: View {
 
             if isSubscriptionActive {
                 Text("You must cancel your subscription before deleting your account")
-                    .font(AppTypography.label)
+                    .font(AppTypography.smallMetadata)
                     .foregroundStyle(AppColor.textSecondary)
                     .italic()
                     .multilineTextAlignment(.center)
@@ -255,7 +261,7 @@ struct UserProfileScreen: View {
     private func sectionContainer<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(title)
-                .font(AppTypography.subhead.weight(.semibold))
+                .font(AppTypography.cardTitle.weight(.semibold))
                 .foregroundStyle(AppColor.textPrimary)
             content()
         }
@@ -284,7 +290,7 @@ struct UserProfileScreen: View {
                 .padding(.vertical, 12)
         }
         .background(color)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.small))
     }
 
     /// Mirrors cancelButton/manageSubscription's outlined style. RN's actual `cancelButton`
@@ -292,7 +298,7 @@ struct UserProfileScreen: View {
     /// on its light `surface` fill — not replicated here, since that's a real contrast bug
     /// in the source, not a deliberate design choice; textPrimary is used instead so Cancel
     /// stays readable.
-    private func outlinedButton(_ title: String, textColor: Color = AppColor.textPrimary, borderColor: Color = AppColor.border, action: @escaping () -> Void) -> some View {
+    private func outlinedButton(_ title: String, textColor: Color = AppColor.textPrimary, borderColor: Color = AppColor.divider, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(AppTypography.body.weight(.medium))
@@ -300,8 +306,8 @@ struct UserProfileScreen: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
         }
-        .background(AppColor.cardSurface)
-        .overlay(RoundedRectangle(cornerRadius: AppRadius.medium).stroke(borderColor, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium))
+        .background(AppColor.surfaceCard)
+        .overlay(RoundedRectangle(cornerRadius: AppRadius.small).stroke(borderColor, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.small))
     }
 }

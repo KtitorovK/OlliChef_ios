@@ -37,6 +37,14 @@ enum MealPlanStorageService {
         return try snapshot.data(as: MealPlan.self)
     }
 
+    /// Ported from firestoreService.ts's deleteMealPlan: hard-deletes the document.
+    static func delete(_ mealPlanId: String) async throws {
+        guard let uid = currentUserId else {
+            throw FirebaseTokenProviderError.signInRequired
+        }
+        try await collection(for: uid).document(mealPlanId).delete()
+    }
+
     private static func getAll() async throws -> [MealPlan] {
         guard let uid = currentUserId else { return [] }
         let snapshot = try await collection(for: uid).getDocuments()

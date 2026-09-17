@@ -63,6 +63,16 @@ final class ChatViewModel: ObservableObject {
         }
     }
 
+    /// Called when Profile's "Clear Chat History" resets the conversation server-side
+    /// while this view model is still alive (see TabRouter.chatHistoryClearedAt) —
+    /// loadHistory() alone would no-op since its `messages.isEmpty` guard is already
+    /// false, so this clears local state first to force a real reload of the fresh,
+    /// empty conversation.
+    func resetAfterExternalClear() async {
+        messages = []
+        await loadHistory()
+    }
+
     func send() async {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
@@ -83,6 +93,7 @@ final class ChatViewModel: ObservableObject {
                 messages.append(ChatMessageItem(id: UUID().uuidString, role: .assistant, content: responseText, timestamp: Date()))
             }
         } catch {
+            print("🔴 CHAT SEND ERROR: \(error)")
             handleError(error, context: ErrorContext(location: "ChatScreen", action: "handleSend"))
             let content = NetworkErrorClassifier.isNetworkError(error)
                 ? NetworkConfig.offlineMessage

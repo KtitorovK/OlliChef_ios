@@ -118,8 +118,8 @@ actor ChatService {
         }
 
         let conversationId = try await getOrCreateConversation()
-        let instructions = await PromptManager.shared.dynamicPrompt()
-        let model = await PromptManager.shared.aiModel()
+        let instructions = try await PromptManager.shared.dynamicPrompt()
+        let model = try await PromptManager.shared.requiredAIModel()
 
         let (data, _) = try await RetryHelpers.retryRequest {
             try await self.client.send(self.baseRequest(

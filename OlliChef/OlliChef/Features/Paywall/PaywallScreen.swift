@@ -14,12 +14,12 @@ struct PaywallScreen: View {
     @Environment(\.openURL) private var openURL
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: AppSpacing.sm) {
             Spacer()
 
-            VStack(spacing: 16) {
+            VStack(spacing: AppSpacing.md) {
                 Text("OlliChef Basic")
-                    .font(AppTypography.title.weight(.bold))
+                    .font(AppTypography.pageTitle)
                     .foregroundStyle(AppColor.textPrimary)
                     .multilineTextAlignment(.center)
                 Text("Monthly subscription — meal planning and grocery list features.")
@@ -29,13 +29,13 @@ struct PaywallScreen: View {
 
                 if viewModel.isLoading {
                     ProgressView()
-                        .tint(AppColor.brandPrimary)
-                        .padding(.vertical, 16)
+                        .tint(AppColor.brandAction)
+                        .padding(.vertical, AppSpacing.md)
                 } else if let priceHint = viewModel.priceHint {
                     Text(priceHint)
-                        .font(AppTypography.caption)
+                        .font(AppTypography.smallMetadata)
                         .foregroundStyle(AppColor.textSecondary)
-                        .padding(.bottom, 16)
+                        .padding(.bottom, AppSpacing.md)
                 }
             }
 
@@ -51,31 +51,31 @@ struct PaywallScreen: View {
             .font(AppTypography.body.weight(.semibold))
             .foregroundStyle(AppColor.textOnBrand)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(AppColor.brandPrimary)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.medium))
+            .padding(.vertical, AppSpacing.md)
+            .background(AppColor.brandAction)
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.small))
             .disabled(viewModel.isPurchasing || viewModel.isLoading)
             .opacity(viewModel.isPurchasing || viewModel.isLoading ? 0.5 : 1)
-            .padding(.bottom, 4)
+            .padding(.bottom, AppSpacing.xxs)
 
             Button {
                 Task { await viewModel.restore(subscriptionState: subscriptionState) }
             } label: {
                 if viewModel.isRestoring {
-                    ProgressView().tint(AppColor.brandPrimary)
+                    ProgressView().tint(AppColor.brandAction)
                 } else {
                     Text("Restore Purchases")
                 }
             }
             .font(AppTypography.body.weight(.medium))
-            .foregroundStyle(AppColor.brandPrimary)
+            .foregroundStyle(AppColor.brandAction)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, AppSpacing.sm)
             .disabled(viewModel.isRestoring)
             .opacity(viewModel.isRestoring ? 0.5 : 1)
-            .padding(.bottom, 16)
+            .padding(.bottom, AppSpacing.md)
 
-            HStack(spacing: 8) {
+            HStack(spacing: AppSpacing.xs) {
                 Button {
                     openURL(LegalURLs.privacyPolicy)
                 } label: {
@@ -88,9 +88,9 @@ struct PaywallScreen: View {
                     Text("Terms of Use").underline()
                 }
             }
-            .font(AppTypography.caption)
+            .font(AppTypography.smallMetadata)
             .foregroundStyle(AppColor.textSecondary)
-            .padding(.bottom, 16)
+            .padding(.bottom, AppSpacing.md)
 
             Button("Sign out") {
                 try? authState.signOut()
@@ -100,7 +100,7 @@ struct PaywallScreen: View {
 
             Spacer()
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, AppSpacing.xxl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppColor.surfaceBody)
         .task { await viewModel.load() }
