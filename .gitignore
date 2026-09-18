@@ -24,6 +24,9 @@ Secrets.swift
 # macOS
 .DS_Store
 
+# Firebase CLI
+firebase-debug.log
+
 # Xcode Cloud / CI artifacts
 *.ipa
 *.dSYM.zip
