@@ -11,23 +11,28 @@ final class PaywallViewModel: ObservableObject {
 
     var isLoading: Bool { isEligibleForTrial == nil }
 
+    // Wording locked by the founder-approved paywall copy (KB §3, Subscription &
+    // Monetisation) for the trial-eligible case; the non-eligible branch isn't part
+    // of that copy (it covers a returning subscriber, not the first-run paywall) so
+    // it stays close to the same voice instead of inventing something new.
     var subscribeLabel: String {
         if isEligibleForTrial == true {
-            return "Start your 14-day free trial"
+            return "Start my free 14-day trial"
         } else if let priceText {
             return "Subscribe for \(priceText)/month"
         }
         return "Subscribe"
     }
 
-    var priceHint: String? {
+    /// Billing terms shown directly under the CTA — Apple treats a trial CTA that
+    /// hides the eventual charge as a dark pattern, so this can't just live in a
+    /// deemphasized line above the button the way `priceHint` used to.
+    var legalFootnote: String? {
+        guard let priceText else { return nil }
         if isEligibleForTrial == true {
-            guard let priceText else { return nil }
-            return "14-day free trial, then \(priceText)/month"
-        } else if let priceText {
-            return "\(priceText)/month · auto-renewing"
+            return "\(priceText)/month after free trial. Cancel anytime in App Store settings. Payment charged at trial end."
         }
-        return nil
+        return "\(priceText)/month, auto-renewing. Cancel anytime in App Store settings."
     }
 
     /// Mirrors the effect in PaywallScreen.tsx. RN also calls getStatus() first to
