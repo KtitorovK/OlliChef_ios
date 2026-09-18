@@ -13,11 +13,15 @@ enum SessionPhase {
     case main
 }
 
-/// DEV SWITCH — set to `false` before testing the paywall/purchase flow with a
-/// sandbox account, and before any TestFlight/App Store build. While `true`, the
-/// subscription gate is skipped entirely so the rest of the app can be tested without
-/// completing a purchase every time.
-let bypassPaywallForTesting = true
+/// DEV SWITCH — flip to `true` locally while testing other screens without
+/// completing a purchase every time. Gated behind `#if DEBUG` so a Release/Archive
+/// build (App Store, TestFlight) always compiles this to `false` regardless of what's
+/// checked in — the subscription gate can no longer ship disabled by accident.
+#if DEBUG
+let bypassPaywallForTesting = false
+#else
+let bypassPaywallForTesting = false
+#endif
 
 struct RootView: View {
     @StateObject private var authState = AuthState()

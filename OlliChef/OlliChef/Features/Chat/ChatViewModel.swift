@@ -93,7 +93,6 @@ final class ChatViewModel: ObservableObject {
                 messages.append(ChatMessageItem(id: UUID().uuidString, role: .assistant, content: responseText, timestamp: Date()))
             }
         } catch {
-            print("🔴 CHAT SEND ERROR: \(error)")
             handleError(error, context: ErrorContext(location: "ChatScreen", action: "handleSend"))
             let content = NetworkErrorClassifier.isNetworkError(error)
                 ? NetworkConfig.offlineMessage
