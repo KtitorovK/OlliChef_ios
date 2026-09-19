@@ -115,6 +115,7 @@
 				0F89F4A43052F5740076DB4C /* Sources */,
 				0F89F4A53052F5740076DB4C /* Frameworks */,
 				0F89F4A63052F5740076DB4C /* Resources */,
+				0F89F5A03052F5760076DB4C /* Generate Framework dSYMs */,
 			);
 			buildRules = (
 			);
@@ -251,6 +252,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		0F89F5A03052F5760076DB4C /* Generate Framework dSYMs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Framework dSYMs";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Firebase's prebuilt gRPC/Abseil/Firestore binaries ship without dSYMs, so App Store\n# Connect uploads warn about missing symbols. Generate stub dSYMs with matching UUIDs.\nif [ \"${CONFIGURATION}\" = \"Release\" ] && [ -n \"${DWARF_DSYM_FOLDER_PATH}\" ]; then\n  for n in absl grpc grpcpp openssl_grpc FirebaseFirestoreInternal; do\n    bin=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/${n}.framework/${n}\"\n    if [ -f \"$bin\" ]; then\n      dsymutil \"$bin\" -o \"${DWARF_DSYM_FOLDER_PATH}/${n}.framework.dSYM\" 2>/dev/null || true\n    fi\n  done\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		0F89F4A43052F5740076DB4C /* Sources */ = {
@@ -419,7 +442,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = OlliChef/OlliChef.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 66;
 				DEVELOPMENT_TEAM = A7YB7N2BDJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -435,7 +458,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.biteplanai;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -460,9 +483,10 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_ENTITLEMENTS = OlliChef/OlliChef.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 66;
 				DEVELOPMENT_TEAM = A7YB7N2BDJ;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = OlliChef;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.food-and-drink";
@@ -476,7 +500,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.biteplanai;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
