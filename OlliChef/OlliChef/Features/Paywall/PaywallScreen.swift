@@ -53,9 +53,8 @@ struct PaywallScreen: View {
                 // the app has, and it needs to read at a glance, not be squinted at.
                 Image(isIPad ? "PaywallHeroIpad" : "PaywallHero")
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
                     .frame(maxWidth: .infinity)
-                    .frame(height: isIPad ? 340 : 260)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
                     .shadow(color: AppColor.textPrimary.opacity(0.08), radius: 8, y: 4)
                     .padding(.top, AppSpacing.lg)
