@@ -17,9 +17,12 @@ actor APIClient {
         self.session = session
     }
 
-    func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+    /// `timeout` defaults to `NetworkConfig.timeout` but can be overridden per call —
+    /// chat send passes a longer one, since generating a large meal plan can genuinely
+    /// take longer than the default budget that's fine for every other, smaller request.
+    func send(_ request: URLRequest, timeout: TimeInterval = NetworkConfig.timeout) async throws -> (Data, HTTPURLResponse) {
         var req = request
-        req.timeoutInterval = NetworkConfig.timeout
+        req.timeoutInterval = timeout
         if req.value(forHTTPHeaderField: "Content-Type") == nil {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
@@ -30,8 +33,8 @@ actor APIClient {
         return try await performWithTokenRetry(req, retried: false)
     }
 
-    func send<T: Decodable>(_ request: URLRequest, decoding type: T.Type) async throws -> T {
-        let (data, _) = try await send(request)
+    func send<T: Decodable>(_ request: URLRequest, decoding type: T.Type, timeout: TimeInterval = NetworkConfig.timeout) async throws -> T {
+        let (data, _) = try await send(request, timeout: timeout)
         do {
             return try JSONDecoder().decode(T.self, from: data)
         } catch {

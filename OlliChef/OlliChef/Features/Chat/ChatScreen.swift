@@ -81,7 +81,12 @@ struct ChatScreen: View {
             .padding(.horizontal, AppSpacing.md)
             .frame(minHeight: metrics.textInputHeight)
             .background(AppColor.surfaceCard)
-            .clipShape(Capsule())
+            // Capsule()'s radius is always half the view's own height, which reads as a
+            // pill at the field's single-line minHeight but balloons into an odd bulging
+            // shape once multi-line text grows it taller. A fixed radius stays a normal
+            // rounded rectangle at any height, and still looks like a pill at minHeight
+            // since AppRadius.large (24) is close to half of textInputHeight (52).
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.large))
 
             Button {
                 Task { await viewModel.send() }

@@ -58,7 +58,6 @@ struct MealPlanScreen: View {
                 selectedDate = viewModel.mealPlan?.days.first?.date
             }
         }
-        .refreshable { await viewModel.load() }
         .onChange(of: viewModel.mealPlan?.id) {
             tabRouter.hasMealPlan = viewModel.mealPlan != nil
         }
@@ -80,46 +79,71 @@ struct MealPlanScreen: View {
         }
     }
 
-    /// Mirrors renderDaySelector: a horizontal strip of date pills, auto-scrolling to
-    /// keep the selected pill in view, that drives the paged day browser below it.
-    /// Selected uses BrandForest (a strong, deliberate selection color); unselected
-    /// pills use the subtle BrandTint instead of the same saturated green repeated
-    /// across every day, which read as one undifferentiated bright-green block.
+    /// Mirrors renderDaySelector: a strip of date pills that drives the paged day
+    /// browser below it. Selected uses BrandForest (a strong, deliberate selection
+    /// color); unselected pills use the subtle BrandTint instead of the same saturated
+    /// green repeated across every day, which read as one undifferentiated block.
+    ///
+    /// Up to a week's worth of days lay out at equal flexible width, filling the
+    /// screen edge-to-edge instead of a fixed chip width that left the last day or two
+    /// cut off at the edge on iPhone. Beyond that, a fixed chip width would either
+    /// overflow further or shrink chips past readability, so scrolling takes over.
     private func daySelector(_ mealPlan: MealPlan) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
+        Group {
+            if mealPlan.days.count <= 7 {
                 HStack(spacing: metrics.dayChipGap) {
                     ForEach(mealPlan.days, id: \.date) { day in
-                        let isSelected = day.date == selectedDate
-                        Button {
-                            withAnimation { selectedDate = day.date }
-                        } label: {
-                            VStack(spacing: 2) {
-                                Text(day.pillWeekdayLabel)
-                                    .font(AppTypography.smallMetadata.weight(.semibold))
-                                Text(day.pillDateLabel)
-                                    .font(AppTypography.tabLabel)
-                            }
-                            .foregroundStyle(isSelected ? AppColor.textOnBrand : AppColor.brandForest)
-                            .frame(width: metrics.dayChipWidth, height: metrics.dayChipHeight)
-                            .background(isSelected ? AppColor.brandForest : AppColor.brandTint)
-                            .clipShape(RoundedRectangle(cornerRadius: metrics.dayChipRadius))
-                        }
-                        .hoverEffect(.highlight)
-                        .id(day.date)
-                        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+                        dayChip(day).frame(maxWidth: .infinity)
                     }
                 }
                 .padding(.horizontal, AppSpacing.md)
-            }
-            .frame(height: 80)
-            .background(AppColor.surfaceHeader)
-            .onChange(of: selectedDate) {
-                if let selectedDate {
-                    withAnimation { proxy.scrollTo(selectedDate, anchor: .center) }
+                .frame(height: 80)
+                .background(AppColor.surfaceHeader)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: metrics.dayChipGap) {
+                            ForEach(mealPlan.days, id: \.date) { day in
+                                dayChip(day)
+                                    .frame(width: metrics.dayChipWidth)
+                                    .id(day.date)
+                            }
+                        }
+                        .padding(.horizontal, AppSpacing.md)
+                    }
+                    .frame(height: 80)
+                    .background(AppColor.surfaceHeader)
+                    .onChange(of: selectedDate) {
+                        if let selectedDate {
+                            withAnimation { proxy.scrollTo(selectedDate, anchor: .center) }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private func dayChip(_ day: DayMeals) -> some View {
+        let isSelected = day.date == selectedDate
+        return Button {
+            withAnimation { selectedDate = day.date }
+        } label: {
+            VStack(spacing: 2) {
+                Text(day.pillWeekdayLabel)
+                    .font(AppTypography.smallMetadata.weight(.semibold))
+                Text(day.pillDateLabel)
+                    .font(AppTypography.tabLabel)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .foregroundStyle(isSelected ? AppColor.textOnBrand : AppColor.brandForest)
+            .frame(height: metrics.dayChipHeight)
+            .frame(maxWidth: .infinity)
+            .background(isSelected ? AppColor.brandForest : AppColor.brandTint)
+            .clipShape(RoundedRectangle(cornerRadius: metrics.dayChipRadius))
+        }
+        .hoverEffect(.highlight)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
     private var emptyState: some View {
@@ -179,6 +203,11 @@ struct MealPlanScreen: View {
             .frame(maxWidth: metrics.mealPlanContentMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        // Scoped to this vertical ScrollView specifically, not the whole screen — when
+        // .refreshable sat on an ancestor of both this and the horizontal day-selector
+        // strip above it, its pull-to-refresh gesture bled onto that strip too, letting
+        // a purely-horizontal picker be dragged vertically.
+        .refreshable { await viewModel.load() }
     }
 }
 

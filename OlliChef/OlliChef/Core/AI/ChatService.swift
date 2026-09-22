@@ -131,7 +131,7 @@ actor ChatService {
                     "input": [["role": "user", "content": message]],
                     "conversation": conversationId,
                 ]
-            ))
+            ), timeout: NetworkConfig.chatSendTimeout)
         }
 
         let result = try JSONDecoder().decode(ResponsesAPIResult.self, from: data)

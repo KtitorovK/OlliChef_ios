@@ -51,6 +51,14 @@ nonisolated struct Meal: Codable, Hashable, Identifiable {
     var nutritionInfo: NutritionInfo?
 }
 
+#if DEBUG
+/// DEV SWITCH — set to a "yyyy-MM-dd" string to make `DayMeals.isToday` treat that
+/// date as "today" instead of the real device date (e.g. for App Store screenshots
+/// that need the "Today" badge to land on a specific day). Compiled out entirely
+/// outside DEBUG, so it can never ship live. Set back to nil when done.
+var debugTodayOverride: String? = nil
+#endif
+
 nonisolated struct DayMeals: Codable, Hashable {
     var date: String
     var day: String?
@@ -72,6 +80,11 @@ nonisolated struct DayMeals: Codable, Hashable {
 
     var isToday: Bool {
         guard let dateValue else { return false }
+        #if DEBUG
+        if let debugTodayOverride, let overrideDate = Self.dateFormatter.date(from: debugTodayOverride) {
+            return Calendar.current.isDate(dateValue, inSameDayAs: overrideDate)
+        }
+        #endif
         return Calendar.current.isDateInToday(dateValue)
     }
 
