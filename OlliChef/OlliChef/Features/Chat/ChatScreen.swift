@@ -76,6 +76,7 @@ struct ChatScreen: View {
                 TextField("", text: $viewModel.inputText, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(AppTypography.body)
+                    .id(viewModel.composerResetToken)
             }
             .padding(.horizontal, AppSpacing.md)
             .frame(minHeight: metrics.textInputHeight)

@@ -32,6 +32,12 @@ enum AcceptStep {
 final class ChatViewModel: ObservableObject {
     @Published var messages: [ChatMessageItem] = []
     @Published var inputText = ""
+    // A multiline `TextField(axis: .vertical)` bound to `inputText` doesn't reliably
+    // repaint when the binding is cleared from code while the field still has focus —
+    // a known SwiftUI quirk, confirmed live after send(). Bumping this and keying the
+    // TextField's view identity to it (see ChatScreen) forces SwiftUI to recreate the
+    // field on every clear instead of trusting the stale one to redraw itself.
+    @Published var composerResetToken = 0
     @Published var isThinking = false
     @Published var isAccepting = false
     @Published var acceptStep: AcceptStep = .saving
@@ -78,6 +84,7 @@ final class ChatViewModel: ObservableObject {
         guard !text.isEmpty else { return }
 
         inputText = ""
+        composerResetToken += 1
         messages.append(ChatMessageItem(id: UUID().uuidString, role: .user, content: text, timestamp: Date()))
         isThinking = true
         defer { isThinking = false }

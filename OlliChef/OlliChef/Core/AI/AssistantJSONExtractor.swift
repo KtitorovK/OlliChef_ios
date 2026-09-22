@@ -89,8 +89,77 @@ nonisolated enum AssistantJSONExtractor {
         )
     }
 
+    /// The model is explicitly told to use plain numerals for protein_g/fat_g/carbs_g
+    /// and mostly does, but occasionally still spells one out on a long response (e.g.
+    /// `"carbs_g": fifty`) — also invalid JSON, since a bare identifier isn't a valid
+    /// value. Same repair strategy as `repairMissingUnitKey`: fix the one specific shape
+    /// before parsing rather than losing the whole meal plan to one word deep in it.
+    /// Matches are replaced back-to-front so each replacement's own offset shift never
+    /// invalidates the ranges of matches still waiting to be applied.
+    private static func repairSpelledOutNumbers(_ text: String) -> String {
+        let pattern = #""(protein_g|fat_g|carbs_g)"\s*:\s*([A-Za-z][A-Za-z\s-]*[A-Za-z])\s*([,}])"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+        var result = text
+        let range = NSRange(result.startIndex..., in: result)
+        let matches = regex.matches(in: result, range: range)
+
+        for match in matches.reversed() {
+            guard let fullRange = Range(match.range, in: result),
+                  let keyRange = Range(match.range(at: 1), in: result),
+                  let wordRange = Range(match.range(at: 2), in: result),
+                  let terminatorRange = Range(match.range(at: 3), in: result),
+                  let number = NumberWordParser.parse(String(result[wordRange])) else { continue }
+            let key = result[keyRange]
+            let terminator = result[terminatorRange]
+            result.replaceSubrange(fullRange, with: "\"\(key)\": \(number)\(terminator)")
+        }
+        return result
+    }
+
     private static func attemptParse(_ candidate: String) -> [String: Any]? {
-        guard let data = repairMissingUnitKey(candidate).data(using: .utf8) else { return nil }
+        let repaired = repairSpelledOutNumbers(repairMissingUnitKey(candidate))
+        guard let data = repaired.data(using: .utf8) else { return nil }
         return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+}
+
+/// Parses simple English number words up to a few hundred — enough range for a
+/// per-meal gram count, not a general-purpose word-to-number parser. Returns nil for
+/// anything it doesn't recognize, so an unrecognized phrase leaves the JSON untouched
+/// and parsing fails safely rather than guessing at a value.
+private enum NumberWordParser {
+    private static let ones: [String: Int] = [
+        "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+        "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+        "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+        "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+    ]
+    private static let tens: [String: Int] = [
+        "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+        "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+    ]
+
+    static func parse(_ phrase: String) -> Int? {
+        let normalized = phrase
+            .lowercased()
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: " and ", with: " ")
+        let words = normalized.split(separator: " ").map(String.init)
+        guard !words.isEmpty else { return nil }
+
+        var current = 0
+        for word in words {
+            if let value = ones[word] {
+                current += value
+            } else if let value = tens[word] {
+                current += value
+            } else if word == "hundred" {
+                guard current > 0 else { return nil }
+                current *= 100
+            } else {
+                return nil
+            }
+        }
+        return current
     }
 }

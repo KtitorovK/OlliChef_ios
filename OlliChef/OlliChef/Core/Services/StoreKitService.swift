@@ -100,7 +100,7 @@ actor StoreKitService {
         guard let product = try await Product.products(for: [Self.productID]).first else {
             throw StoreKitServiceError.productNotFound
         }
-        let result = try await product.purchase()
+        let result = try await Self.purchaseOnActiveScene(product)
         switch result {
         case .success(let verification):
             let transaction = try Self.checkVerified(verification)
@@ -127,6 +127,17 @@ actor StoreKitService {
     func showManageSubscriptions() async throws {
         guard let scene = await Self.activeWindowScene() else { return }
         try await AppStore.showManageSubscriptions(in: scene)
+    }
+
+    /// A bare `product.purchase()` has no window to present the purchase sheet on; from
+    /// SwiftUI that can end with nothing shown at all. Handing StoreKit the foreground
+    /// scene (iOS 17+, `confirmIn:`) gives it somewhere to present.
+    @MainActor
+    private static func purchaseOnActiveScene(_ product: Product) async throws -> Product.PurchaseResult {
+        if let scene = activeWindowScene() {
+            return try await product.purchase(confirmIn: scene)
+        }
+        return try await product.purchase()
     }
 
     /// UIScene's `activationState` is genuinely MainActor-isolated in UIKit (not a
