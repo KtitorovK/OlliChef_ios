@@ -57,44 +57,62 @@ struct OnboardingScreen: View {
     ]
 
     private var isLast: Bool { index == slides.count - 1 }
-    /// The screenshot's own share of the screen — the rest goes to the plain text
-    /// panel below it.
+    /// The screenshot's own share of each slide's height — the rest goes to the plain
+    /// text panel below it.
     private let imageFraction: CGFloat = 0.58
 
     var body: some View {
+        ZStack(alignment: .topTrailing) {
+            // Each page carries its own image + text, so the swipeable area is the
+            // whole slide, not just the image strip — putting the text in a separate
+            // view outside the TabView (an earlier version of this screen did) shrank
+            // the swipe gesture down to just that top image band, which read as swipe
+            // "not working" everywhere else on the page.
+            TabView(selection: $index) {
+                ForEach(slides) { slide in
+                    slideView(slide).tag(slide.id)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .ignoresSafeArea(edges: .top)
+
+            Button("Skip", action: onComplete)
+                .font(AppTypography.cardTitle.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(.black.opacity(0.32), in: Capsule())
+                .padding(.trailing, 20)
+                .padding(.top, 8)
+                .accessibilityIdentifier("onboarding.skip")
+        }
+        .background(AppColor.surfaceBody)
+        .animation(.easeInOut(duration: 0.25), value: index)
+    }
+
+    private func goNext() {
+        if index < slides.count - 1 {
+            withAnimation { index += 1 }
+        }
+    }
+
+    private func slideView(_ slide: OnboardingSlideContent) -> some View {
         GeometryReader { geo in
             VStack(spacing: 0) {
-                ZStack(alignment: .topTrailing) {
-                    TabView(selection: $index) {
-                        ForEach(slides) { slide in
-                            slideImage(slide).tag(slide.id)
-                        }
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-
-                    Button("Skip", action: onComplete)
-                        .font(AppTypography.cardTitle.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(.black.opacity(0.32), in: Capsule())
-                        .padding(.trailing, 20)
-                        .padding(.top, 8)
-                        .accessibilityIdentifier("onboarding.skip")
-                }
-                .frame(height: geo.size.height * imageFraction)
-                .ignoresSafeArea(edges: .top)
+                slideImage(slide)
+                    .frame(height: geo.size.height * imageFraction)
+                    .clipped()
 
                 VStack(spacing: AppSpacing.md) {
                     VStack(spacing: AppSpacing.xs) {
-                        Text(slides[index].headline)
+                        Text(slide.headline)
                             .font(.system(size: isIPad ? 40 : 26, weight: .bold))
                             .foregroundStyle(AppColor.textPrimary)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("onboarding.headline")
 
-                        Text(slides[index].body)
+                        Text(slide.body)
                             .font(.system(size: isIPad ? 22 : 17))
                             .foregroundStyle(AppColor.textSecondary)
                             .multilineTextAlignment(.center)
@@ -103,10 +121,10 @@ struct OnboardingScreen: View {
                     .frame(maxWidth: isIPad ? 620 : 340)
 
                     HStack(spacing: 8) {
-                        ForEach(slides) { slide in
+                        ForEach(slides) { s in
                             Capsule()
-                                .fill(slide.id == index ? AppColor.brandAction : AppColor.textSecondary.opacity(0.35))
-                                .frame(width: slide.id == index ? 20 : 8, height: 8)
+                                .fill(s.id == index ? AppColor.brandAction : AppColor.textSecondary.opacity(0.35))
+                                .frame(width: s.id == index ? 20 : 8, height: 8)
                         }
                     }
 
@@ -130,14 +148,6 @@ struct OnboardingScreen: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AppColor.surfaceBody)
             }
-        }
-        .background(AppColor.surfaceBody)
-        .animation(.easeInOut(duration: 0.25), value: index)
-    }
-
-    private func goNext() {
-        if index < slides.count - 1 {
-            withAnimation { index += 1 }
         }
     }
 
