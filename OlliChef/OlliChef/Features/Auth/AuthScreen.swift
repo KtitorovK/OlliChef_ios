@@ -10,37 +10,51 @@ struct AuthScreen: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: AppSpacing.contentPadding) {
-            Spacer().frame(height: 96)
+        ZStack(alignment: .bottomTrailing) {
+            VStack(spacing: AppSpacing.contentPadding) {
+                Spacer().frame(height: 96)
 
-            Text("OlliChef")
-                .font(AppTypography.displayXL.weight(.bold))
-                .foregroundStyle(AppColor.brandForest)
-                .accessibilityIdentifier("auth.title")
+                Text("OlliChef")
+                    .font(AppTypography.displayXL.weight(.bold))
+                    .foregroundStyle(AppColor.brandForest)
+                    .accessibilityIdentifier("auth.title")
 
-            Text("Your AI chef for easy meal planning")
-                .font(AppTypography.body)
-                .foregroundStyle(AppColor.textSecondary)
-                .accessibilityIdentifier("auth.tagline")
+                Text("Your AI chef for easy meal planning")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppColor.textSecondary)
+                    .accessibilityIdentifier("auth.tagline")
 
-            Spacer()
+                Spacer()
 
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(AppTypography.smallMetadata)
-                    .foregroundStyle(AppColor.statusError)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, AppSpacing.contentPadding)
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(AppTypography.smallMetadata)
+                        .foregroundStyle(AppColor.statusError)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, AppSpacing.contentPadding)
+                }
+
+                SignInWithAppleButton(.signIn, onRequest: configure, onCompletion: handle)
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 50)
+                    .padding(.horizontal, AppSpacing.buttonHorizontal)
+                    .disabled(authState.isLoading)
             }
+            .padding(.bottom, 32)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            SignInWithAppleButton(.signIn, onRequest: configure, onCompletion: handle)
-                .signInWithAppleButtonStyle(.black)
-                .frame(height: 50)
-                .padding(.horizontal, AppSpacing.buttonHorizontal)
-                .disabled(authState.isLoading)
+            // Peeking in from behind the screen's own trailing edge — inset just
+            // enough that his face and gripping hands stay fully on screen (a
+            // positive offset here pushed him too far past the edge, cropping part
+            // of him off instead of just the intended sliver at his very side).
+            Image("ChefMascot")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 220)
+                .offset(x: -20, y: -140)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
-        .padding(.bottom, 32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppColor.surfaceBody)
     }
 
