@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// NavigationLink(value:) silently fails to reach an ancestor's navigationDestination
 /// when it sits inside this screen's own page-style day-pager TabView nested inside
@@ -31,6 +32,20 @@ struct MealPlanScreen: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var metrics: AppMetrics { AppMetrics(horizontalSizeClass: horizontalSizeClass) }
+
+    /// A simple, fully deterministic image size — 40% of the card's own content width,
+    /// square. Replaces an earlier text-height-matching scheme entirely: matching the
+    /// image to the tallest measured title across the whole plan kept producing small
+    /// but real inconsistencies from one day to another (font-metric estimates are
+    /// never pixel-perfect) that were hard to fully close. A fixed fraction of a width
+    /// that's already identical on every card sidesteps the problem outright — it's
+    /// the same number every time, from nothing but the screen's own width, with no
+    /// per-meal text measurement involved at all.
+    private var imageSize: CGFloat {
+        let screenWidth = min(UIScreen.main.bounds.width, metrics.mealPlanContentMaxWidth)
+        let cardContentWidth = screenWidth - metrics.screenPadding * 2
+        return cardContentWidth * 0.4
+    }
 
     var body: some View {
         Group {
@@ -176,6 +191,24 @@ struct MealPlanScreen: View {
     }
 
     private func dayView(_ day: DayMeals) -> some View {
+        DayMealsSection(
+            day: day,
+            metrics: metrics,
+            imageSize: imageSize,
+            onRefresh: { await viewModel.load() }
+        )
+    }
+}
+
+/// Broken out of MealPlanScreen mainly for readability — `imageSize` is computed once
+/// up there, from the whole plan's data, and just threaded down here unchanged.
+private struct DayMealsSection: View {
+    let day: DayMeals
+    let metrics: AppMetrics
+    let imageSize: CGFloat
+    let onRefresh: () async -> Void
+
+    var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.contentPadding) {
                 HStack {
@@ -195,7 +228,7 @@ struct MealPlanScreen: View {
                 }
 
                 ForEach(day.meals) { meal in
-                    MealCardView(meal: meal, metrics: metrics)
+                    MealCardView(meal: meal, metrics: metrics, imageSize: imageSize)
                 }
             }
             .padding(.vertical, AppSpacing.contentPadding)
@@ -207,7 +240,7 @@ struct MealPlanScreen: View {
         // .refreshable sat on an ancestor of both this and the horizontal day-selector
         // strip above it, its pull-to-refresh gesture bled onto that strip too, letting
         // a purely-horizontal picker be dragged vertically.
-        .refreshable { await viewModel.load() }
+        .refreshable { await onRefresh() }
     }
 }
 
@@ -222,14 +255,19 @@ struct MealPlanScreen: View {
 private struct MealCardView: View {
     let meal: Meal
     let metrics: AppMetrics
+    /// 40% of the card's own width, computed once in MealPlanScreen — see that type
+    /// for why this isn't matched to this card's own text height anymore.
+    let imageSize: CGFloat
     @State private var isExpanded = false
     @Environment(\.mealTapAction) private var mealTapAction
 
-    /// The base thumbnail size, grown further while expanded so the enlarged photo and the
-    /// ingredients list (now beside it, not below the whole row) grow together — a deliberate
-    /// per-user-request deviation from RN, which never resizes the thumbnail on expand.
+    /// While expanded, this card's own image deliberately grows past the shared
+    /// imageSize — the enlarged photo and the now-visible ingredients list (beside it,
+    /// not below the whole row) grow together, a per-user-request deviation from RN.
+    /// Every other (collapsed) card keeps the shared imageSize, so expanding one meal
+    /// doesn't resize every other thumbnail on the page.
     private var thumbSize: CGFloat {
-        isExpanded ? metrics.mealImageSize * 1.6 : metrics.mealImageSize
+        isExpanded ? metrics.mealImageSize * 1.6 : imageSize
     }
 
     private var thumbRadius: CGFloat {
@@ -246,7 +284,16 @@ private struct MealCardView: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: AppSpacing.md) {
+        // spacing: 0 and no padding here — the image sits flush against the card's own
+        // left/top edge with zero margin; the gap after it and the card's inset around
+        // the text are both the text column's own padding now (see below), not this
+        // HStack's, so they never accidentally apply to the image. Since imageSize is
+        // now a fixed value (not matched to this card's own text height), the image
+        // only ends up flush against the bottom edge too when it's the taller of the
+        // two — a long, multi-line title can still leave a small gap below a
+        // fixed-size image, the deliberate trade-off of a simple, fully predictable
+        // size over one that chases every title's exact height.
+        HStack(alignment: .top, spacing: 0) {
             mealLink {
                 MealImageView(mealName: meal.name, overrideBox: (thumbSize, thumbSize, thumbRadius))
             }
@@ -254,36 +301,38 @@ private struct MealCardView: View {
             .hoverEffect(.highlight)
 
             VStack(alignment: .leading, spacing: AppSpacing.xxs) {
-                mealLink {
-                    VStack(alignment: .leading, spacing: AppSpacing.xxs) {
-                        Text(meal.type?.capitalized ?? "Meal")
-                            .font(AppTypography.metadata.weight(.semibold))
-                            .foregroundStyle(AppColor.textSecondary)
-                        Text(meal.name)
-                            .font(AppTypography.cardTitle)
-                            .foregroundStyle(AppColor.textPrimary)
-                        if let nutrition = meal.nutritionInfo {
-                            Text(nutrition.summaryText)
-                                .font(AppTypography.metadata)
+                VStack(alignment: .leading, spacing: AppSpacing.xxs) {
+                    mealLink {
+                        VStack(alignment: .leading, spacing: AppSpacing.xxs) {
+                            Text(meal.type?.capitalized ?? "Meal")
+                                .font(AppTypography.metadata.weight(.semibold))
                                 .foregroundStyle(AppColor.textSecondary)
+                            Text(meal.name)
+                                .font(AppTypography.cardTitle)
+                                .foregroundStyle(AppColor.textPrimary)
+                            if let nutrition = meal.nutritionInfo {
+                                Text(nutrition.summaryText)
+                                    .font(AppTypography.metadata)
+                                    .foregroundStyle(AppColor.textSecondary)
+                            }
                         }
-                    }
-                }
-                .buttonStyle(.plain)
-                .hoverEffect(.highlight)
-
-                if !meal.ingredients.isEmpty {
-                    Button {
-                        withAnimation { isExpanded.toggle() }
-                    } label: {
-                        Text(isExpanded ? "Hide Details" : "View Details")
-                            .font(AppTypography.metadata.weight(.medium))
-                            .foregroundStyle(AppColor.brandAction)
-                            .underline()
                     }
                     .buttonStyle(.plain)
                     .hoverEffect(.highlight)
-                    .accessibilityLabel(isExpanded ? "Hide ingredient details" : "View ingredient details")
+
+                    if !meal.ingredients.isEmpty {
+                        Button {
+                            withAnimation { isExpanded.toggle() }
+                        } label: {
+                            Text(isExpanded ? "Hide Details" : "View Details")
+                                .font(AppTypography.metadata.weight(.medium))
+                                .foregroundStyle(AppColor.brandAction)
+                                .underline()
+                        }
+                        .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
+                        .accessibilityLabel(isExpanded ? "Hide ingredient details" : "View ingredient details")
+                    }
                 }
 
                 if isExpanded, !meal.ingredients.isEmpty {
@@ -302,9 +351,16 @@ private struct MealCardView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
+            // The text's own margins — independent of the image, which has none.
+            // leading is the gap after the image (previously the HStack's spacing);
+            // top/trailing/bottom match the card's normal inset, same amounts as
+            // before this change, just owned by the text now instead of the whole row.
+            .padding(.leading, AppSpacing.md)
+            .padding(.top, metrics.cardPadding)
+            .padding(.trailing, metrics.cardPadding)
+            .padding(.bottom, metrics.cardPadding)
             Spacer(minLength: 0)
         }
-        .padding(metrics.cardPadding)
         .background(AppColor.surfaceCard)
         .clipShape(RoundedRectangle(cornerRadius: metrics.cardRadius))
     }

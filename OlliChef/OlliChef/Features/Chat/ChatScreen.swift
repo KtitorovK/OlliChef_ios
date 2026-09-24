@@ -149,7 +149,8 @@ struct ChatScreen: View {
             .padding(.horizontal, AppSpacing.xl)
             .frame(width: metrics.isRegular ? 320 : 240)
             .background(AppColor.surfaceCard)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.small))
+            // Matches the composer, bubbles, and meal plan card's rounding.
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.large))
             .shadow(color: AppColor.textPrimary.opacity(0.2), radius: 16, y: 8)
         }
         .transition(.opacity)
@@ -192,7 +193,10 @@ struct ChatScreen: View {
                     .padding(.horizontal, AppSpacing.md)
                     .padding(.vertical, AppSpacing.sm)
                     .background(message.role == .user ? AppColor.brandAction : AppColor.surfaceCard)
-                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.small))
+                    // Matches the composer input's rounding (AppRadius.large) instead
+                    // of the smaller card radius, so bubbles and the input read as the
+                    // same rounded-pill family instead of two different shapes.
+                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.large))
                 if message.role == .assistant { Spacer(minLength: 40) }
             }
         }
@@ -253,7 +257,10 @@ private struct MealPlanCard: View {
         }
         .padding(AppSpacing.contentPadding)
         .background(AppColor.surfaceCard)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.small))
+        // Matches the composer input's rounding and the message bubbles above, rather
+        // than the smaller generic card radius — one consistent rounded-pill family
+        // across every shape on this screen.
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.large))
         .overlay {
             // surfaceCard (#fff) sits on a near-identical cream page background
             // (surfaceBody, #fefdf2) — the same 1px-apart colors RN itself uses — so
@@ -261,7 +268,7 @@ private struct MealPlanCard: View {
             // this card floating over a plain screen; here it floats inside a scrolling
             // chat thread, where that lack of contrast reads as a layout bug rather than
             // an intentional flat design, so a hairline border makes the shape legible.
-            RoundedRectangle(cornerRadius: AppRadius.small)
+            RoundedRectangle(cornerRadius: AppRadius.large)
                 .stroke(AppColor.divider, lineWidth: 1)
         }
         // On iPad's much wider detail column this card had no cap at all and stretched
