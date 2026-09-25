@@ -93,14 +93,14 @@ final class ChatViewModel: ObservableObject {
             let responseText = try await ChatService.shared.sendMessage(text)
 
             if let json = AssistantJSONExtractor.tryExtractJSON(from: responseText) {
-                if AssistantJSONExtractor.isStructuredMealPlan(json), var mealPlan = MealPlanParser.parse(json) {
-                    // Safety net for a confirmed prompt-compliance gap: the model is
-                    // told to always return the complete week on an edit, but doesn't
-                    // always comply. Splice in any days missing relative to the most
-                    // recent plan shown in this conversation rather than letting a
-                    // partial response silently truncate the rest of the week.
-                    let previousPlan = messages.last { $0.mealPlan != nil }?.mealPlan
-                    mealPlan = MealPlanParser.reconcile(updated: mealPlan, previous: previousPlan)
+                if AssistantJSONExtractor.isStructuredMealPlan(json), let mealPlan = MealPlanParser.parse(json) {
+                    // No client-side merging with the previous plan: whether this is an
+                    // edit (keep the rest of the week) or an intentionally fresh plan
+                    // (don't) is a judgment call about the user's actual request, which
+                    // only the model can make — a date-overlap heuristic here can't
+                    // reliably tell the two apart and was confirmed live to sometimes
+                    // glue stale days onto a plan the user asked to replace entirely.
+                    // The dynamic prompt now states this distinction directly instead.
                     #if DEBUG
                     let mealCounts = mealPlan.days.map { "\($0.day ?? $0.date): \($0.meals.count)" }.joined(separator: ", ")
                     print("🟢 [ChatViewModel] Parsed meal plan — \(mealPlan.days.count) days [\(mealCounts)]")

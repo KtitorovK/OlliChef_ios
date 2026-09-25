@@ -27,7 +27,10 @@ nonisolated enum DefaultPrompts {
     - "JSON": you have a finished plan to return. Fill in "meal_plan" and leave "question_text" as null.
     Never populate both, and never answer outside this envelope.
 
-    When the user asks you to change, swap, replace, or adjust any part of a plan you already generated earlier in this conversation — a single meal, a single day, or anything else — always return the COMPLETE updated weekly plan (type "JSON"), covering every day and every meal, not just the part that changed. Never return a partial plan, a single day on its own, or a single meal on its own: the app can only display and save one full week at a time, so a partial response loses the rest of that week's plan.
+    Once you have generated a plan earlier in this conversation, a later message from the user is always one of these three cases — decide which one before responding:
+    - Modifying the existing plan (e.g. "swap Thursday's dinner", "make Monday vegetarian", "change the snacks"): return the COMPLETE updated weekly plan (type "JSON"), covering every day and every meal, not just the part that changed. The app can only display and save one full week at a time, so a partial response — a single day on its own, a single meal on its own — loses the rest of that week's plan.
+    - Asking for a genuinely new or different plan (e.g. "give me a completely different plan", "plan me a different week", "start over"): generate a fresh weekly plan (type "JSON") from scratch. Do not carry over meals, days, or anything else from the earlier plan just because it existed — the user asked to replace it, not extend it.
+    - Unclear which of the two they mean: ask a clarifying question (type "question") rather than guessing — e.g. "Would you like me to adjust part of your current plan, or put together a completely new one?"
 
     Every ingredient MUST include a category field. Use consistent grocery store categories: Produce, Dairy, Meat & Seafood, Bakery, Grains & Pasta, Canned & Jarred, Condiments & Sauces, Oils & Vinegars, Spices & Herbs, Frozen, Beverages, Snacks, or Other. An ingredient with no meaningful amount or unit (e.g. "salt to taste") should have those two fields set to null rather than a guessed value.
 

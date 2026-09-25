@@ -60,17 +60,24 @@ final class GroceryListViewModel: ObservableObject {
         await persist(list)
     }
 
+    /// Only items still unchecked — a shared list is for someone else to go buy, so
+    /// anything already checked off is done and has nothing to contribute. Dropping
+    /// the per-item checkbox prefix too: it rendered as a broken tofu box in at least
+    /// one share target (confirmed live), and a plain shared text list has no way for
+    /// the recipient to actually check it off anyway, so it was purely decorative.
     func shareText() -> String {
         var text = "🛒 My Grocery List:\n\n"
         for (category, items) in groupedItems {
+            let unchecked = items.filter { !$0.checked }
+            guard !unchecked.isEmpty else { continue }
             text += "📋 \(category):\n"
-            for item in items {
+            for item in unchecked {
                 var amountText = ""
                 if let amount = item.amount {
                     let amountString = amount.truncatingRemainder(dividingBy: 1) == 0 ? String(Int(amount)) : String(amount)
                     amountText = " (\(amountString) \(item.unit ?? ""))"
                 }
-                text += "\(item.checked ? "✅" : "⬜️") \(item.name)\(amountText)\n"
+                text += "\(item.name)\(amountText)\n"
             }
             text += "\n"
         }

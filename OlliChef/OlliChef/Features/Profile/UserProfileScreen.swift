@@ -200,11 +200,19 @@ struct UserProfileScreen: View {
         }
     }
 
+    // "Canceled" used to show here for hasAccess && !willAutoRenew, but that's
+    // misleading — Apple's own RenewalState has no "canceled" state; turning off
+    // auto-renew just means the current period ends normally, and access continues
+    // until then. Apple's vocabulary is subscribed/expired/inGracePeriod/etc., so this
+    // is "Active" like any other still-subscribed state. The separate "Access ends
+    // on" row below (already in a warning color) is what actually signals non-renewal.
+    // Note the `!hasAccess` branch is effectively unreachable in practice: RootView
+    // swaps the whole app to PaywallScreen the moment access is lost, so this screen
+    // can't be showing while that's true — "Expired" is shown there instead.
     private var statusText: String {
         if subscriptionState.isLoading { return "Checking..." }
         if isGrace { return "Billing issue" }
         if isTrial { return "Trial active" }
-        if hasAccess && !willAutoRenew { return "Canceled" }
         if hasAccess { return "Active" }
         return "Not active"
     }

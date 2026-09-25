@@ -11,15 +11,23 @@ final class PaywallViewModel: ObservableObject {
 
     var isLoading: Bool { isEligibleForTrial == nil }
 
+    /// True once `isEligibleForTrial` resolves to false — i.e. this Apple ID has
+    /// used the trial for this subscription before. That's the only reliable signal
+    /// StoreKit gives us for "returning subscriber" without the added work of a
+    /// Win-Back Offers setup, so it's what drives both the "Expired" label and the
+    /// button wording below.
+    var isReturningSubscriber: Bool { isEligibleForTrial == false }
+
     // Wording locked by the founder-approved paywall copy (KB §3, Subscription &
-    // Monetisation) for the trial-eligible case; the non-eligible branch isn't part
-    // of that copy (it covers a returning subscriber, not the first-run paywall) so
-    // it stays close to the same voice instead of inventing something new.
+    // Monetisation) for the trial-eligible case; the returning-subscriber branch
+    // isn't part of that copy (it covers someone whose access already lapsed, not
+    // the first-run paywall) so it stays close to the same voice instead of
+    // inventing something new.
     var subscribeLabel: String {
         if isEligibleForTrial == true {
             return "Start my free 14-day trial"
         } else if let priceText {
-            return "Subscribe for \(priceText)/month"
+            return "Buy for \(priceText)/month"
         }
         return "Subscribe"
     }

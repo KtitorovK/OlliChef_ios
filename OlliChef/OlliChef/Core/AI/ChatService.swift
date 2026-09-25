@@ -205,12 +205,6 @@ actor ChatService {
 
         let now = Date()
         var messages: [ChatMessageItem] = []
-        // Tracked across iterations (oldest-first) so a reload applies the same
-        // missing-days reconciliation as a live send — see MealPlanParser.reconcile.
-        // Without this, history would show the raw (possibly partial) plan a live
-        // session had already patched up, and re-accepting it after a reload could
-        // still truncate the saved week.
-        var previousPlan: MealPlan?
 
         for (index, item) in result.data.reversed().enumerated() {
             guard item.type == "message",
@@ -226,9 +220,7 @@ actor ChatService {
             let timestamp = now.addingTimeInterval(TimeInterval(index))
 
             if role == .assistant, let json = AssistantJSONExtractor.tryExtractJSON(from: text) {
-                if AssistantJSONExtractor.isStructuredMealPlan(json), var mealPlan = MealPlanParser.parse(json) {
-                    mealPlan = MealPlanParser.reconcile(updated: mealPlan, previous: previousPlan)
-                    previousPlan = mealPlan
+                if AssistantJSONExtractor.isStructuredMealPlan(json), let mealPlan = MealPlanParser.parse(json) {
                     messages.append(ChatMessageItem(id: item.id, role: role, content: nil, timestamp: timestamp, mealPlan: mealPlan))
                     continue
                 }

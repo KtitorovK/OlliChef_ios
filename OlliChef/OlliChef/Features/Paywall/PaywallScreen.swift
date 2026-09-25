@@ -47,17 +47,21 @@ struct PaywallScreen: View {
     var body: some View {
         ScrollView {
             VStack(spacing: AppSpacing.xl) {
-                // Cropped tight on the plan-ready moment (a full day's meals plus the
-                // "Accept Plan" button) rather than a shrunk full-screen mockup — the
-                // single most convincing proof of "a full week, planned in seconds"
-                // the app has, and it needs to read at a glance, not be squinted at.
-                Image(isIPad ? "PaywallHeroIpad" : "PaywallHero")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
-                    .shadow(color: AppColor.textPrimary.opacity(0.08), radius: 8, y: 4)
-                    .padding(.top, AppSpacing.lg)
+                Spacer().frame(height: AppSpacing.xl)
+
+                if viewModel.isReturningSubscriber {
+                    // Shown only once trial-eligibility resolves to false — the one
+                    // reliable-without-extra-work signal that this Apple ID has used
+                    // this subscription before. "Expired" matches StoreKit's own
+                    // RenewalState vocabulary (subscribed/expired/...) rather than
+                    // "Canceled", which isn't a real StoreKit state — turning off
+                    // auto-renew doesn't cancel anything, it just lets the current
+                    // period end normally, and by the time this paywall is reachable
+                    // at all that period is already over.
+                    Text("Expired")
+                        .font(AppTypography.smallMetadata.weight(.semibold))
+                        .foregroundStyle(AppColor.statusError)
+                }
 
                 VStack(spacing: AppSpacing.sm) {
                     Text("Your personal AI chef. Every week.")
