@@ -66,4 +66,19 @@ struct AssistantJSONExtractorTests {
         let parsed: [String: Any] = ["type": "JSON"]
         #expect(!AssistantJSONExtractor.isStructuredMealPlan(parsed))
     }
+
+    @Test func extractQuestionTextReturnsTextForQuestionEnvelope() {
+        let parsed: [String: Any] = ["type": "question", "question_text": "What's your family size?", "meal_plan": NSNull()]
+        #expect(AssistantJSONExtractor.extractQuestionText(from: parsed) == "What's your family size?")
+    }
+
+    @Test func extractQuestionTextNilForMealPlanEnvelope() {
+        let parsed: [String: Any] = ["type": "JSON", "question_text": NSNull(), "meal_plan": ["days": [Any]()]]
+        #expect(AssistantJSONExtractor.extractQuestionText(from: parsed) == nil)
+    }
+
+    @Test func extractQuestionTextNilWhenQuestionTextMissing() {
+        let parsed: [String: Any] = ["type": "question"]
+        #expect(AssistantJSONExtractor.extractQuestionText(from: parsed) == nil)
+    }
 }

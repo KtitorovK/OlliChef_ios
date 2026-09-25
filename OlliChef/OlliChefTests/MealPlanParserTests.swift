@@ -142,3 +142,62 @@ struct MealPlanParserParseTests {
         #expect(plan?.userHas == ["olive oil", "salt"])
     }
 }
+
+/// Covers the prompt-compliance safety net: confirmed live, asking the AI to edit
+/// part of a plan can still come back with only the edited day instead of the full
+/// week the prompt asks for — `reconcile` splices the gap shut by date.
+struct MealPlanParserReconcileTests {
+    private func plan(_ dates: [String]) -> MealPlan {
+        MealPlan(
+            id: "meal-plan-\(dates.first ?? "")",
+            startDate: dates.first ?? "",
+            endDate: dates.last ?? "",
+            days: dates.map { DayMeals(date: $0, day: nil, meals: []) },
+            createdAt: "",
+            updatedAt: ""
+        )
+    }
+
+    @Test func fillsInDaysMissingFromAnOverlappingEdit() {
+        let fullWeek = plan(["2026-09-28", "2026-09-29", "2026-09-30"])
+        let editedMondayOnly = plan(["2026-09-28"])
+
+        let reconciled = MealPlanParser.reconcile(updated: editedMondayOnly, previous: fullWeek)
+
+        #expect(reconciled.days.map(\.date) == ["2026-09-28", "2026-09-29", "2026-09-30"])
+    }
+
+    @Test func updatedDayWinsOverPreviousOnTheSameDate() {
+        let previous = MealPlan(
+            id: "p", startDate: "2026-09-28", endDate: "2026-09-28",
+            days: [DayMeals(date: "2026-09-28", day: "Old", meals: [])],
+            createdAt: "", updatedAt: ""
+        )
+        let updated = MealPlan(
+            id: "u", startDate: "2026-09-28", endDate: "2026-09-28",
+            days: [DayMeals(date: "2026-09-28", day: "New", meals: [])],
+            createdAt: "", updatedAt: ""
+        )
+
+        let reconciled = MealPlanParser.reconcile(updated: updated, previous: previous)
+
+        #expect(reconciled.days.first?.day == "New")
+    }
+
+    @Test func doesNotMergeCompletelyDisjointDateRanges() {
+        // A genuinely new plan for a different period (e.g. "plan me November
+        // instead") shouldn't get glued onto the old week.
+        let septemberWeek = plan(["2026-09-28", "2026-09-29"])
+        let novemberWeek = plan(["2026-11-02", "2026-11-03"])
+
+        let reconciled = MealPlanParser.reconcile(updated: novemberWeek, previous: septemberWeek)
+
+        #expect(reconciled.days.map(\.date) == ["2026-11-02", "2026-11-03"])
+    }
+
+    @Test func returnsUpdatedUnchangedWhenNoPreviousPlanExists() {
+        let onlyPlan = plan(["2026-09-28"])
+        let reconciled = MealPlanParser.reconcile(updated: onlyPlan, previous: nil)
+        #expect(reconciled.days.map(\.date) == ["2026-09-28"])
+    }
+}

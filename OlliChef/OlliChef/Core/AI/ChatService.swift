@@ -149,9 +149,19 @@ actor ChatService {
                     "instructions": instructions,
                     "input": [["role": "user", "content": message]],
                     "conversation": conversationId,
+                    "text": ["format": ChatResponseSchema.responseFormat],
                 ]
             ), timeout: NetworkConfig.chatSendTimeout)
         }
+
+        #if DEBUG
+        // Temporary visibility into Structured Outputs while validating the new
+        // envelope live — the full /responses body first (confirms text.format
+        // actually reached OpenAI and what it sent back around the text), then just
+        // the extracted assistant text below (the JSON string that actually gets
+        // parsed downstream, easiest to eyeball for shape/content correctness).
+        print("🔵 [ChatService] Raw /responses body:\n\(String(data: data, encoding: .utf8) ?? "<non-utf8 \(data.count) bytes>")")
+        #endif
 
         let result = try JSONDecoder().decode(ResponsesAPIResult.self, from: data)
 
@@ -172,6 +182,10 @@ actor ChatService {
             return "Sorry, I could not generate a text response. Please try again."
         }
 
+        #if DEBUG
+        print("🟢 [ChatService] Extracted assistant text:\n\(responseText)")
+        #endif
+
         await updateConversationMetadata(conversationId: conversationId)
         return responseText
     }
@@ -190,11 +204,19 @@ actor ChatService {
         let result = try JSONDecoder().decode(ConversationItemsResult.self, from: data)
 
         let now = Date()
-        return result.data.reversed().enumerated().compactMap { index, item in
+        var messages: [ChatMessageItem] = []
+        // Tracked across iterations (oldest-first) so a reload applies the same
+        // missing-days reconciliation as a live send — see MealPlanParser.reconcile.
+        // Without this, history would show the raw (possibly partial) plan a live
+        // session had already patched up, and re-accepting it after a reload could
+        // still truncate the saved week.
+        var previousPlan: MealPlan?
+
+        for (index, item) in result.data.reversed().enumerated() {
             guard item.type == "message",
                   let roleString = item.role,
                   let role = ChatMessageItem.Role(rawValue: roleString) else {
-                return nil
+                continue
             }
 
             let text = (item.content ?? [])
@@ -203,14 +225,24 @@ actor ChatService {
                 .joined()
             let timestamp = now.addingTimeInterval(TimeInterval(index))
 
-            if role == .assistant,
-               let json = AssistantJSONExtractor.tryExtractJSON(from: text),
-               AssistantJSONExtractor.isStructuredMealPlan(json),
-               let mealPlan = MealPlanParser.parse(json) {
-                return ChatMessageItem(id: item.id, role: role, content: nil, timestamp: timestamp, mealPlan: mealPlan)
+            if role == .assistant, let json = AssistantJSONExtractor.tryExtractJSON(from: text) {
+                if AssistantJSONExtractor.isStructuredMealPlan(json), var mealPlan = MealPlanParser.parse(json) {
+                    mealPlan = MealPlanParser.reconcile(updated: mealPlan, previous: previousPlan)
+                    previousPlan = mealPlan
+                    messages.append(ChatMessageItem(id: item.id, role: role, content: nil, timestamp: timestamp, mealPlan: mealPlan))
+                    continue
+                }
+                // Structured Outputs (see ChatResponseSchema) wraps even a plain
+                // clarifying question in a JSON envelope — unwrap it so reloaded
+                // history shows the question text, not the raw envelope.
+                if let questionText = AssistantJSONExtractor.extractQuestionText(from: json) {
+                    messages.append(ChatMessageItem(id: item.id, role: role, content: questionText, timestamp: timestamp))
+                    continue
+                }
             }
-            return ChatMessageItem(id: item.id, role: role, content: text, timestamp: timestamp)
+            messages.append(ChatMessageItem(id: item.id, role: role, content: text, timestamp: timestamp))
         }
+        return messages
     }
 
     /// Mirrors resetChatThread: starts a brand-new conversation, leaving the old

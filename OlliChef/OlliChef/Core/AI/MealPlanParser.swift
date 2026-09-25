@@ -86,4 +86,35 @@ nonisolated enum MealPlanParser {
             userHas: mealPlanJSON["userHas"] as? [String]
         )
     }
+
+    /// The dynamic prompt instructs the model to always return the complete updated
+    /// week when the user asks to change part of an existing plan, never just the
+    /// changed part — but that's a prompt instruction, not something Structured
+    /// Outputs' schema can enforce (the schema has no way to express "must contain
+    /// every day the previous plan had"). Confirmed live: after a few clarifying
+    /// questions, the model returned only the one edited day. Accepting that
+    /// response as-is would silently drop the rest of the week from the saved plan,
+    /// so this splices `updated`'s days into `previous`'s by date — `updated` wins
+    /// on any date both share (that's the actual edit), and any date only
+    /// `previous` has is carried forward unchanged.
+    ///
+    /// Only merges when at least one date overlaps between the two plans — a
+    /// completely disjoint date range (e.g. "actually, plan me a totally different
+    /// week starting in November") is treated as an intentional new plan, not a
+    /// partial edit, and returned unchanged.
+    static func reconcile(updated: MealPlan, previous: MealPlan?) -> MealPlan {
+        guard let previous else { return updated }
+
+        let updatedDates = Set(updated.days.map(\.date))
+        let previousDates = Set(previous.days.map(\.date))
+        guard !updatedDates.isDisjoint(with: previousDates) else { return updated }
+
+        var byDate: [String: DayMeals] = [:]
+        for day in previous.days { byDate[day.date] = day }
+        for day in updated.days { byDate[day.date] = day }
+
+        var merged = updated
+        merged.days = byDate.values.sorted { $0.date < $1.date }
+        return merged
+    }
 }

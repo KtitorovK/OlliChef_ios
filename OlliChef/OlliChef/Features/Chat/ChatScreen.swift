@@ -212,7 +212,23 @@ private struct MealPlanCard: View {
     let onAccept: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // See MealPlanScreen's MealTapActionKey: on iPad, a NavigationLink(value:) inside
+    // this NavigationSplitView's detail column silently fails to reach the
+    // navigationDestination declared on an ancestor (a real, unresolved SwiftUI bug on
+    // this SDK) — confirmed live here too ("no matching navigationDestination
+    // declaration visible"). MealPlanScreen's own meal cards already work around it via
+    // this same environment value; this card just hadn't been updated to check it.
+    @Environment(\.mealTapAction) private var mealTapAction
     private var metrics: AppMetrics { AppMetrics(horizontalSizeClass: horizontalSizeClass) }
+
+    @ViewBuilder
+    private func mealLink<Label: View>(_ meal: Meal, @ViewBuilder label: () -> Label) -> some View {
+        if let mealTapAction {
+            Button { mealTapAction(meal) } label: { label() }
+        } else {
+            NavigationLink(value: meal) { label() }
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.md) {
@@ -222,7 +238,7 @@ private struct MealPlanCard: View {
                         .font(AppTypography.cardTitle)
                         .foregroundStyle(AppColor.textPrimary)
                     ForEach(day.meals) { meal in
-                        NavigationLink(value: meal) {
+                        mealLink(meal) {
                             mealRow(meal)
                         }
                         .buttonStyle(.plain)

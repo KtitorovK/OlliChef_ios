@@ -92,11 +92,38 @@ final class ChatViewModel: ObservableObject {
         do {
             let responseText = try await ChatService.shared.sendMessage(text)
 
-            if let json = AssistantJSONExtractor.tryExtractJSON(from: responseText),
-               AssistantJSONExtractor.isStructuredMealPlan(json),
-               let mealPlan = MealPlanParser.parse(json) {
-                messages.append(ChatMessageItem(id: UUID().uuidString, role: .assistant, content: nil, timestamp: Date(), mealPlan: mealPlan))
+            if let json = AssistantJSONExtractor.tryExtractJSON(from: responseText) {
+                if AssistantJSONExtractor.isStructuredMealPlan(json), var mealPlan = MealPlanParser.parse(json) {
+                    // Safety net for a confirmed prompt-compliance gap: the model is
+                    // told to always return the complete week on an edit, but doesn't
+                    // always comply. Splice in any days missing relative to the most
+                    // recent plan shown in this conversation rather than letting a
+                    // partial response silently truncate the rest of the week.
+                    let previousPlan = messages.last { $0.mealPlan != nil }?.mealPlan
+                    mealPlan = MealPlanParser.reconcile(updated: mealPlan, previous: previousPlan)
+                    #if DEBUG
+                    let mealCounts = mealPlan.days.map { "\($0.day ?? $0.date): \($0.meals.count)" }.joined(separator: ", ")
+                    print("🟢 [ChatViewModel] Parsed meal plan — \(mealPlan.days.count) days [\(mealCounts)]")
+                    #endif
+                    messages.append(ChatMessageItem(id: UUID().uuidString, role: .assistant, content: nil, timestamp: Date(), mealPlan: mealPlan))
+                } else if let questionText = AssistantJSONExtractor.extractQuestionText(from: json) {
+                    // The Structured Outputs envelope (see ChatResponseSchema) wraps even
+                    // a plain clarifying question in JSON — unwrap it rather than showing
+                    // the raw envelope text.
+                    #if DEBUG
+                    print("🟢 [ChatViewModel] Parsed question envelope: \(questionText)")
+                    #endif
+                    messages.append(ChatMessageItem(id: UUID().uuidString, role: .assistant, content: questionText, timestamp: Date()))
+                } else {
+                    #if DEBUG
+                    print("🟡 [ChatViewModel] Parsed as JSON but unrecognized envelope shape — showing raw text: \(json)")
+                    #endif
+                    messages.append(ChatMessageItem(id: UUID().uuidString, role: .assistant, content: responseText, timestamp: Date()))
+                }
             } else {
+                #if DEBUG
+                print("🟡 [ChatViewModel] Response wasn't JSON at all (pre-migration plain-text shape)")
+                #endif
                 messages.append(ChatMessageItem(id: UUID().uuidString, role: .assistant, content: responseText, timestamp: Date()))
             }
         } catch {

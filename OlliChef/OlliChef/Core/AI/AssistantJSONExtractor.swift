@@ -72,6 +72,18 @@ nonisolated enum AssistantJSONExtractor {
         return true
     }
 
+    /// Since adopting Structured Outputs (see ChatResponseSchema), every chat response
+    /// is a JSON envelope with a `type` field — "JSON" for a plan (handled by
+    /// `isStructuredMealPlan` above, unchanged) or "question" for a clarifying
+    /// question, whose actual text lives in `question_text` rather than being the raw
+    /// response body. A conversation predating this change has plain-text questions
+    /// with no envelope at all, which this simply doesn't match — callers fall back to
+    /// treating the raw text as the message content, exactly as before.
+    static func extractQuestionText(from parsed: [String: Any]) -> String? {
+        guard (parsed["type"] as? String) == "question" else { return nil }
+        return parsed["question_text"] as? String
+    }
+
     /// The model occasionally drops the "unit" key partway through a long ingredient
     /// list — e.g. `"amount": 1, "can"` instead of `"amount": 1, "unit": "can"` —
     /// which is invalid JSON (a bare value with no key) and fails parsing outright.
