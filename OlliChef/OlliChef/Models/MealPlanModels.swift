@@ -56,7 +56,11 @@ nonisolated struct Meal: Codable, Hashable, Identifiable {
 /// date as "today" instead of the real device date (e.g. for App Store screenshots
 /// that need the "Today" badge to land on a specific day). Compiled out entirely
 /// outside DEBUG, so it can never ship live. Set back to nil when done.
-var debugTodayOverride: String? = nil
+// nonisolated(unsafe): read from `DayMeals.isToday`, a nonisolated computed property,
+// so under SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor this global would otherwise be
+// MainActor-isolated and unreadable from there. Fine here — it's a manually-edited
+// debug constant, never written at runtime, not a real concurrency hazard.
+nonisolated(unsafe) var debugTodayOverride: String? = nil
 #endif
 
 nonisolated struct DayMeals: Codable, Hashable {

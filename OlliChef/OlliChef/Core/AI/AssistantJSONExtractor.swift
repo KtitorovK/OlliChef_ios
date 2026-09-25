@@ -127,7 +127,13 @@ nonisolated enum AssistantJSONExtractor {
 /// per-meal gram count, not a general-purpose word-to-number parser. Returns nil for
 /// anything it doesn't recognize, so an unrecognized phrase leaves the JSON untouched
 /// and parsing fails safely rather than guessing at a value.
-private enum NumberWordParser {
+///
+/// `nonisolated` for the same reason as `AssistantJSONExtractor` itself: without it,
+/// the project's `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` setting makes this
+/// MainActor-isolated, and `AssistantJSONExtractor.repairSpelledOutNumbers` (itself
+/// nonisolated) calling `.parse` synchronously from there is exactly the "main
+/// actor-isolated method in a synchronous nonisolated context" error.
+private nonisolated enum NumberWordParser {
     private static let ones: [String: Int] = [
         "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
         "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,

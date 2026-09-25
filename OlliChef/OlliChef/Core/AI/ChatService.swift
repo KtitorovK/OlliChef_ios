@@ -73,7 +73,7 @@ actor ChatService {
             if let currentConversationId {
                 return try await ChatConversationService.get(currentConversationId)
             }
-            if let recent = try await ChatConversationService.mostRecent() {
+            if let recent = try await findMostRecentConversationWithRetry() {
                 currentConversationId = recent.id
                 return recent
             }
@@ -82,6 +82,25 @@ actor ChatService {
             handleError(error, context: ErrorContext(location: "ChatService", action: "getCurrentConversation"))
             return nil
         }
+    }
+
+    /// `ChatConversationService.mostRecent()` returns nil both when the user genuinely
+    /// has no conversation yet and when `Auth.auth().currentUser` isn't readable yet —
+    /// the two are indistinguishable from here, and `getOrCreateConversation()` treats
+    /// either as "create a fresh one". Confirmed live on a physical device (not the
+    /// simulator): the very first authenticated Firestore query right after a cold
+    /// launch + fresh sign-in can resolve before the connection is fully warmed up,
+    /// which silently created a brand-new empty conversation and stranded the user's
+    /// real history behind it — fixed by signing out and back in, which re-ran this
+    /// same lookup against an already-warm connection. One retry after a short delay
+    /// absorbs that race; a genuinely new user just pays one harmless extra ~700ms on
+    /// their very first chat load.
+    private func findMostRecentConversationWithRetry() async throws -> ChatConversation? {
+        if let recent = try await ChatConversationService.mostRecent() {
+            return recent
+        }
+        try? await Task.sleep(nanoseconds: 700_000_000)
+        return try await ChatConversationService.mostRecent()
     }
 
     private func createNewConversation() async throws -> String {

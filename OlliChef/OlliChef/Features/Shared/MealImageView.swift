@@ -1,4 +1,20 @@
 import SwiftUI
+import UIKit
+
+/// In-memory cache for the actual downloaded image bytes, keyed by URL string.
+/// PexelsService already caches the resolved *URL* persistently (UserDefaults), but
+/// nothing previously cached the image itself — `AsyncImage` alone has no cross-view
+/// cache, so every time a `MealImageView` was torn down and recreated (e.g. Chat's
+/// `LazyVStack` discarding off-screen row state on every new message, confirmed live:
+/// pictures visibly reloaded on every send) it re-fetched the same photo from
+/// scratch. `NSCache` is thread-safe and evicts under memory pressure on its own.
+private enum MealImageCache {
+    static let shared: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 200
+        return cache
+    }()
+}
 
 /// Ported from MealImage.tsx: fetches a meal's photo via PexelsService, showing a
 /// spinner while looking it up and a fallback icon tile if none was found.
@@ -32,6 +48,7 @@ struct MealImageView: View {
     var overrideBox: (width: CGFloat?, height: CGFloat, radius: CGFloat)?
 
     @State private var imageURL: String?
+    @State private var loadedImage: UIImage?
     @State private var isLoading = true
 
     private var boxHeight: CGFloat { overrideBox?.height ?? size.box.height }
@@ -54,29 +71,39 @@ struct MealImageView: View {
             .frame(width: width, height: boxHeight)
             .clipShape(RoundedRectangle(cornerRadius: boxRadius))
             .task(id: mealName) {
-                isLoading = true
-                imageURL = await PexelsService.shared.getFoodImage(mealName: mealName)
-                isLoading = false
+                defer { isLoading = false }
+                guard let url = await PexelsService.shared.getFoodImage(mealName: mealName) else {
+                    imageURL = nil
+                    return
+                }
+                imageURL = url
+                // Checked first, synchronously — this is the case that matters most:
+                // a view instance recreated fresh (e.g. Chat's LazyVStack discarding
+                // off-screen rows) resolves to the same URL PexelsService already
+                // cached, and if the bytes are already in MealImageCache too, this
+                // returns instantly with no visible reload at all.
+                if let cached = MealImageCache.shared.object(forKey: url as NSString) {
+                    loadedImage = cached
+                    return
+                }
+                guard let (data, _) = try? await URLSession.shared.data(from: URL(string: url)!),
+                      let image = UIImage(data: data) else { return }
+                MealImageCache.shared.setObject(image, forKey: url as NSString)
+                loadedImage = image
             }
     }
 
     @ViewBuilder
     private var content: some View {
-        if isLoading {
+        if let loadedImage {
+            Image(uiImage: loadedImage).resizable().scaledToFill()
+        } else if isLoading {
             placeholderTile {
                 ProgressView().tint(AppColor.brandAccent)
             }
-        } else if let imageURL, let url = URL(string: imageURL) {
-            AsyncImage(url: url) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFill()
-                } else if phase.error != nil {
-                    placeholderTile { fallbackIcon }
-                } else {
-                    placeholderTile { EmptyView() }
-                }
-            }
         } else {
+            // Covers both "no URL found" and "URL found but the download failed" —
+            // same fallback either way, matching AsyncImage's old error-phase behavior.
             placeholderTile { fallbackIcon }
         }
     }

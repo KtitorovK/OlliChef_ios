@@ -13,7 +13,12 @@ struct RecipeStoryScreen: View {
     @StateObject private var viewModel = RecipeStoryViewModel()
 
     private var sections: [MarkdownSection]? {
-        viewModel.story.map(Self.parseSections)
+        // A bare `Self.parseSections` reference here would need to convert a
+        // MainActor-isolated static method into a plain, isolation-erased function
+        // value to satisfy `Optional.map`'s signature — which is exactly what
+        // `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` flags. Wrapping it in a
+        // closure keeps the call inside this MainActor context instead.
+        viewModel.story.map { Self.parseSections($0) }
     }
 
     var body: some View {
@@ -29,7 +34,7 @@ struct RecipeStoryScreen: View {
                         .font(AppTypography.pageTitle)
                         .foregroundStyle(AppColor.textPrimary)
 
-                    if let overview = sections.flatMap(Self.overviewBody), !overview.isEmpty {
+                    if let overview = sections.flatMap({ Self.overviewBody(from: $0) }), !overview.isEmpty {
                         Text(overview)
                             .font(AppTypography.body)
                             .foregroundStyle(AppColor.textSecondary)
@@ -270,7 +275,7 @@ struct RecipeStoryScreen: View {
     }
 
     private static func overviewBody(from sections: [MarkdownSection]) -> String? {
-        sections.first { $0.heading.map(isOverviewHeading) == true }?.body
+        sections.first { $0.heading.map { isOverviewHeading($0) } == true }?.body
     }
 
     /// Steps are identified by position (everything right after the "Instructions"
@@ -279,8 +284,8 @@ struct RecipeStoryScreen: View {
     /// model drops its number entirely — the numbering is only used afterward, to
     /// pick a per-step Pexels search query.
     private static func stepSections(from sections: [MarkdownSection]) -> [MarkdownSection] {
-        guard let instructionsIndex = sections.firstIndex(where: { $0.heading.map(isInstructionsHeading) == true }) else {
-            return sections.filter { $0.heading.flatMap(stepNumberAndTitle) != nil }
+        guard let instructionsIndex = sections.firstIndex(where: { $0.heading.map { isInstructionsHeading($0) } == true }) else {
+            return sections.filter { $0.heading.flatMap { stepNumberAndTitle(from: $0) } != nil }
         }
         let afterInstructions = sections[(instructionsIndex + 1)...]
         return Array(afterInstructions.prefix { section in
