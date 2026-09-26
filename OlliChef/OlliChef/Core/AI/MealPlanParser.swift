@@ -10,6 +10,8 @@ nonisolated enum MealPlanParser {
     static func parse(_ json: [String: Any]) -> MealPlan? {
         guard let mealPlanJSON = json["meal_plan"] as? [String: Any] else { return nil }
 
+        let daysJSON = mealPlanJSON["days"] as? [[String: Any]] ?? []
+
         var startDate = ""
         var endDate = ""
         if let week = mealPlanJSON["week"] as? String,
@@ -20,8 +22,20 @@ nonisolated enum MealPlanParser {
                 endDate = parts[1]
             }
         }
+        if startDate.isEmpty || endDate.isEmpty {
+            // The AI doesn't always phrase a single-day plan as a "week" range (e.g. "plan
+            // for today" naturally reads as one date, not "X to X") — fall back to the
+            // days actually returned so a single-day plan still gets a real date range.
+            // Without this, startDate/endDate stay "", and MealPlanStorageService.
+            // currentMealPlan()'s "startDate <= today && endDate >= today" filter can never
+            // match an empty string, so the plan saves but never shows on Meal Plan/Groceries.
+            let dayDates = daysJSON.compactMap { $0["date"] as? String }.filter { !$0.isEmpty }.sorted()
+            if let first = dayDates.first, let last = dayDates.last {
+                startDate = first
+                endDate = last
+            }
+        }
 
-        let daysJSON = mealPlanJSON["days"] as? [[String: Any]] ?? []
         let days: [DayMeals] = daysJSON.map { dayJSON in
             let date = dayJSON["date"] as? String ?? ""
             let day = dayJSON["day"] as? String

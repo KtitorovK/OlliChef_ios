@@ -36,13 +36,41 @@ struct MealPlanParserParseTests {
         #expect(plan?.id == "meal-plan-2026-09-12")
     }
 
-    @Test func leavesDatesEmptyWhenWeekStringDoesntMatchExpectedFormat() {
+    @Test func leavesDatesEmptyWhenWeekStringDoesntMatchExpectedFormatAndNoDays() {
         let json = decodeJSON(#"""
         {"meal_plan": {"week": "sometime next week", "days": []}}
         """#)
         let plan = MealPlanParser.parse(json)
         #expect(plan?.startDate == "")
         #expect(plan?.endDate == "")
+    }
+
+    @Test func derivesDateRangeFromDaysWhenWeekIsASingleDate() {
+        // A single-day request (e.g. "plan for today") naturally reads as one date to the
+        // AI, not an "X to X" range — the parser should still recover a usable range from
+        // the day(s) actually returned, since MealPlanStorageService.currentMealPlan()
+        // can never match an empty startDate/endDate.
+        let json = decodeJSON(#"""
+        {"meal_plan": {"week": "2026-09-25", "days": [
+            {"date": "2026-09-25", "day": "Friday", "meals": [{"name": "Toast"}]}
+        ]}}
+        """#)
+        let plan = MealPlanParser.parse(json)
+        #expect(plan?.startDate == "2026-09-25")
+        #expect(plan?.endDate == "2026-09-25")
+        #expect(plan?.id == "meal-plan-2026-09-25")
+    }
+
+    @Test func derivesDateRangeFromDaysWhenWeekFieldMissingEntirely() {
+        let json = decodeJSON(#"""
+        {"meal_plan": {"days": [
+            {"date": "2026-09-25", "meals": [{"name": "Toast"}]},
+            {"date": "2026-09-27", "meals": [{"name": "Pasta"}]}
+        ]}}
+        """#)
+        let plan = MealPlanParser.parse(json)
+        #expect(plan?.startDate == "2026-09-25")
+        #expect(plan?.endDate == "2026-09-27")
     }
 
     @Test func parsesADayWithMealsIngredientsAndNutrition() {

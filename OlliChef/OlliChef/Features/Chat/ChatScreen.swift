@@ -7,6 +7,7 @@ struct ChatScreen: View {
     @StateObject private var viewModel = ChatViewModel()
     @EnvironmentObject private var tabRouter: TabRouter
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @FocusState private var isComposerFocused: Bool
     private var metrics: AppMetrics { AppMetrics(horizontalSizeClass: horizontalSizeClass) }
 
     var body: some View {
@@ -38,6 +39,12 @@ struct ChatScreen: View {
                 }
                 .onChange(of: viewModel.messages.count) { scrollToBottom(proxy) }
                 .onChange(of: viewModel.isThinking) { scrollToBottom(proxy) }
+                // Tapping anywhere in the message list should collapse the composer's
+                // keyboard, same as tapping outside a text field anywhere else in the
+                // app — a plain tap gesture here doesn't compete with the ScrollView's
+                // own drag-to-scroll gesture.
+                .contentShape(Rectangle())
+                .onTapGesture { isComposerFocused = false }
             }
 
             Divider()
@@ -77,6 +84,7 @@ struct ChatScreen: View {
                     .textFieldStyle(.plain)
                     .font(AppTypography.body)
                     .id(viewModel.composerResetToken)
+                    .focused($isComposerFocused)
             }
             .padding(.horizontal, AppSpacing.md)
             .frame(minHeight: metrics.textInputHeight)
